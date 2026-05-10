@@ -995,7 +995,7 @@ function openEditUser(officer) {
         </div>
         <div class="field" style="margin-top:4px;">
           <label class="check"><input type="checkbox" name="is_admin" ${officer && officer.is_admin ? 'checked' : ''}> Admin <span style="color:var(--slate-500);font-weight:400;">— can manage users, programmes, and view the audit log</span></label>
-          ${isNew ? '' : `<label class="check" style="margin-top:8px;"><input type="checkbox" name="is_active" ${officer.is_active ? 'checked' : ''} ${me && officer.id === me.id ? 'disabled' : ''}> Active <span style="color:var(--slate-500);font-weight:400;">— can sign in${me && officer.id === me.id ? ' (you can\\'t deactivate yourself)' : ''}</span></label>`}
+          ${isNew ? '' : `<label class="check" style="margin-top:8px;"><input type="checkbox" name="is_active" ${officer.is_active ? 'checked' : ''} ${me && officer.id === me.id ? 'disabled' : ''}> Active <span style="color:var(--slate-500);font-weight:400;">— can sign in${me && officer.id === me.id ? " (you can't deactivate yourself)" : ''}</span></label>`}
         </div>
         <div id="user-error" class="error-flash" hidden></div>
       </form>
