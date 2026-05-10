@@ -264,4 +264,122 @@ async function sendStatusChangeEmail(app, event) {
   console.log(`[mail] status_change → ${app.applicant_email} (${app.code} → ${event.status})${messageId ? ' resend:' + messageId : ' [disk only]'}`);
 }
 
-module.exports = { sendSubmissionEmail, sendStatusChangeEmail, MAIL_DIR };
+/* =========================================================
+   Diagnostics — used by the /healthz/email endpoint
+   ========================================================= */
+
+/** Static config snapshot. No secrets leaked; the key's presence is reported
+ *  but the key itself is never returned. */
+function emailConfig() {
+  let mailOutWritable = false;
+  let mailOutCount = 0;
+  try {
+    fs.accessSync(MAIL_DIR, fs.constants.W_OK);
+    mailOutWritable = true;
+    mailOutCount = fs.readdirSync(MAIL_DIR).length;
+  } catch (_) { /* directory not writable */ }
+
+  return {
+    resend_api_key_set: Boolean(RESEND_API_KEY),
+    from_email: FROM_EMAIL,
+    tracker_base_url: TRACKER_BASE,
+    mail_out_dir: MAIL_DIR,
+    mail_out_writable: mailOutWritable,
+    mail_out_folders: mailOutCount
+  };
+}
+
+/** Send a real test email through Resend (and write to disk like normal).
+ *  Returns { ok, message_id, disk_path, error }. Used by an officer-only
+ *  diagnostic endpoint. */
+async function sendTestEmail({ to, sentByOfficer }) {
+  if (!to || typeof to !== 'string' || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) {
+    return { ok: false, error: 'A valid `to` address is required.' };
+  }
+  const subject = `GovBB Tracker — email test`;
+  const text = [
+    `Hi,`,
+    ``,
+    `This is a test email from the GovBB Application Tracker, sent at ${new Date().toUTCString()}.`,
+    ``,
+    `If you're reading this in an inbox, end-to-end delivery via Resend is working.`,
+    ``,
+    `Triggered by: ${sentByOfficer || 'an officer'}`,
+    `Tracker base URL: ${TRACKER_BASE}`,
+    ``,
+    `— GovBB Tracker`
+  ].join('\n');
+
+  const html = baseTemplate({
+    headline: 'Email test',
+    body: `
+      <p>This is a test email from the <strong>GovBB Application Tracker</strong>.</p>
+      <p>If you're reading this in an inbox, end-to-end delivery via Resend is working.</p>
+      <p style="color:#595959; font-size:14px;">
+        Sent at: ${new Date().toUTCString()}<br>
+        Triggered by: ${escapeHtml(sentByOfficer || 'an officer')}<br>
+        Tracker base URL: <a href="${TRACKER_BASE}">${escapeHtml(TRACKER_BASE)}</a>
+      </p>
+    `
+  });
+
+  const diskPath = writeEmailToDisk({
+    to, subject, text, html,
+    application_id: null,
+    kind: 'test'
+  });
+
+  if (!RESEND_API_KEY) {
+    return {
+      ok: true,
+      message_id: null,
+      disk_path: diskPath,
+      delivered_via: 'disk-only',
+      note: 'RESEND_API_KEY not set — email written to disk only, no real send attempted.'
+    };
+  }
+
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${RESEND_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ from: FROM_EMAIL, to: [to], subject, html, text })
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      return {
+        ok: false,
+        message_id: null,
+        disk_path: diskPath,
+        delivered_via: 'disk-only',
+        error: `Resend ${res.status}: ${errText.slice(0, 500)}`
+      };
+    }
+    const data = await res.json();
+    return {
+      ok: true,
+      message_id: data && data.id ? data.id : null,
+      disk_path: diskPath,
+      delivered_via: 'resend'
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      message_id: null,
+      disk_path: diskPath,
+      delivered_via: 'disk-only',
+      error: `Network error: ${e.message}`
+    };
+  }
+}
+
+module.exports = {
+  sendSubmissionEmail,
+  sendStatusChangeEmail,
+  emailConfig,
+  sendTestEmail,
+  MAIL_DIR
+};

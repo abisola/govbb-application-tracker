@@ -45,6 +45,31 @@ Open `body.html` in a browser to see the email as the citizen would see it.
 
 In production, swap `notifications.js` for a real transport (SES, Mailgun, GovBB's own SMTP relay) — the `writeEmailToDisk` function is the only thing that changes.
 
+### Email diagnostics
+
+Two endpoints help confirm the email pipeline is working end-to-end:
+
+- `GET /healthz/email` — public. Reports whether `RESEND_API_KEY` is set, the `FROM_EMAIL`, the tracker base URL, and whether the mail-out directory is writable. No secrets exposed. Returns `{ "ok": true }` only when the key is present and the disk is writable.
+- `POST /api/officer/test-email` — officer auth required. Body: `{"to": "you@example.com"}` (optional – defaults to the signed-in officer's email). Sends a real test email through Resend, writes the audit copy to disk, and returns the Resend message id (`re_…`) on success or the Resend error text on failure. Auth is required so the endpoint isn't an open relay.
+
+A typical post-deploy check from a terminal:
+
+```sh
+# 1. Config is wired up?
+curl https://your-service.onrender.com/healthz/email
+
+# 2. Sign in, then send a real test
+curl -c cookies.txt -X POST https://your-service.onrender.com/api/officer/login \
+  -H "Content-Type: application/json" \
+  -d '{"username":"andrea","password":"<from deploy logs>"}'
+
+curl -b cookies.txt -X POST https://your-service.onrender.com/api/officer/test-email \
+  -H "Content-Type: application/json" \
+  -d '{"to":"you@example.com"}'
+```
+
+A `200` response with `"delivered_via": "resend"` and a `message_id` starting `re_` confirms full delivery. A `502` with a Resend error in the body tells you exactly what's misconfigured (most often: `FROM_EMAIL` uses a domain that isn't verified yet).
+
 ## How the existing alpha.gov.bb forms wire in
 
 The forms processor on alpha.gov.bb POSTs every submission to this tracker over HTTPS, in addition to its existing email-the-MDA flow. The processor generates the reference code (so the citizen's confirmation email and the tracker have the same code from the moment of submission) and sends it across.

@@ -40,7 +40,12 @@ const {
 const { generateUniqueCode } = require('./codes');
 const { authenticateOfficer, requireOfficer } = require('./auth');
 const { requireApiKey } = require('./apikey');
-const { sendSubmissionEmail, sendStatusChangeEmail } = require('./notifications');
+const {
+  sendSubmissionEmail,
+  sendStatusChangeEmail,
+  emailConfig,
+  sendTestEmail
+} = require('./notifications');
 
 const app = express();
 const PORT = process.env.PORT || 3030;
@@ -75,6 +80,30 @@ app.use(session({
 
 // Lightweight health check for Render's load balancer.
 app.get('/healthz', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
+
+// Email config check — public, no secrets exposed. Tells you whether the key
+// is present, the From address, and whether the mail-out dir is writable.
+app.get('/healthz/email', (req, res) => {
+  const cfg = emailConfig();
+  res.json({
+    ok: cfg.resend_api_key_set && cfg.mail_out_writable,
+    config: cfg,
+    instructions: cfg.resend_api_key_set
+      ? 'Looks configured. POST /api/officer/test-email with {"to":"you@example.com"} to send a real test (officer auth required).'
+      : 'RESEND_API_KEY is not set — emails will land on disk only. Set it in Render env vars to enable real send.'
+  });
+});
+
+// Officer-only: actually send a real test email. Auth required so this isn't
+// an open relay.
+app.post('/api/officer/test-email', requireOfficer, async (req, res) => {
+  const { to } = req.body || {};
+  const result = await sendTestEmail({
+    to: (to || '').trim() || req.session.officer.email || null,
+    sentByOfficer: req.session.officer.username
+  });
+  res.status(result.ok ? 200 : 502).json(result);
+});
 
 /* =========================================================
    Static + page routes
