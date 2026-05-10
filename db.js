@@ -44,7 +44,9 @@ CREATE TABLE IF NOT EXISTS programmes (
   default_sla_days INTEGER NOT NULL DEFAULT 14,
   allowed_statuses TEXT NOT NULL,
   contact_email TEXT,
-  contact_phone TEXT
+  contact_phone TEXT,
+  accepting_applications INTEGER NOT NULL DEFAULT 1,
+  closed_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS applicants (
@@ -63,6 +65,8 @@ CREATE TABLE IF NOT EXISTS officers (
   email TEXT NOT NULL,
   ministry TEXT NOT NULL,
   role TEXT NOT NULL,
+  is_admin INTEGER NOT NULL DEFAULT 0,
+  is_active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -75,6 +79,7 @@ CREATE TABLE IF NOT EXISTS applications (
   current_status_at TEXT NOT NULL,
   assigned_officer_id INTEGER REFERENCES officers(id),
   form_data TEXT,
+  flagged_after_close INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -108,12 +113,61 @@ CREATE TABLE IF NOT EXISTS api_clients (
   last_used_at TEXT
 );
 
+-- Many-to-many: which officers can see/manage which programmes.
+-- An officer with ZERO rows in this table sees nothing. The seed and the
+-- "create officer" admin path both populate every programme by default; the
+-- admin can then revoke specific rows.
+CREATE TABLE IF NOT EXISTS officer_programmes (
+  officer_id INTEGER NOT NULL REFERENCES officers(id) ON DELETE CASCADE,
+  programme_id INTEGER NOT NULL REFERENCES programmes(id) ON DELETE CASCADE,
+  granted_at TEXT NOT NULL DEFAULT (datetime('now')),
+  granted_by_officer_id INTEGER REFERENCES officers(id),
+  PRIMARY KEY (officer_id, programme_id)
+);
+
+-- Append-only audit log of every meaningful action in the system. The
+-- before/after JSON columns capture the diff so you can reconstruct any
+-- entity's history without complex joins.
+CREATE TABLE IF NOT EXISTS audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor_officer_id INTEGER REFERENCES officers(id),
+  actor_label TEXT,           -- denormalised for cases where the officer is later deleted
+  action TEXT NOT NULL,       -- e.g. 'officer.create', 'application.status_change', 'login.fail'
+  target_kind TEXT,           -- 'officer' | 'programme' | 'application' | 'session' | 'api_client' | null
+  target_id INTEGER,
+  before_json TEXT,
+  after_json TEXT,
+  metadata_json TEXT,         -- free-form: ip, user agent, application code, etc.
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(current_status);
 CREATE INDEX IF NOT EXISTS idx_applications_programme ON applications(programme_id);
 CREATE INDEX IF NOT EXISTS idx_status_events_app ON status_events(application_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_app ON notifications(application_id);
 CREATE INDEX IF NOT EXISTS idx_api_clients_keyhash ON api_clients(key_hash);
+CREATE INDEX IF NOT EXISTS idx_officer_programmes_officer ON officer_programmes(officer_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_audit_log_target ON audit_log(target_kind, target_id);
 `);
+
+/* =========================================================
+   Idempotent migrations for databases created before these columns existed.
+   Safe to run on every boot — each ALTER is wrapped in a column-presence check.
+   ========================================================= */
+function tableHasColumn(table, column) {
+  return db.prepare(`PRAGMA table_info(${table})`).all().some(c => c.name === column);
+}
+function addColumnIfMissing(table, column, definition) {
+  if (!tableHasColumn(table, column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+addColumnIfMissing('officers',     'is_admin',                 'INTEGER NOT NULL DEFAULT 0');
+addColumnIfMissing('officers',     'is_active',                'INTEGER NOT NULL DEFAULT 1');
+addColumnIfMissing('programmes',   'accepting_applications',   'INTEGER NOT NULL DEFAULT 1');
+addColumnIfMissing('programmes',   'closed_at',                'TEXT');
+addColumnIfMissing('applications', 'flagged_after_close',      'INTEGER NOT NULL DEFAULT 0');
 
 /* =========================================================
    Helpers
@@ -168,19 +222,68 @@ function getApplicationByCode(code) {
   return app;
 }
 
-/** List for the officer console. Includes the same joins. */
-function listApplicationsForOfficer() {
+/**
+ * List for the officer console. If `officerId` is supplied AND the officer
+ * is NOT an admin, the result is filtered to programmes they're assigned to.
+ * Admins see everything.
+ */
+function listApplicationsForOfficer(officerId, isAdmin) {
+  if (isAdmin || officerId == null) {
+    return db.prepare(`
+      SELECT a.id, a.code, a.current_status, a.current_status_at, a.created_at,
+             a.flagged_after_close,
+             p.code AS programme_code, p.name AS programme_name, p.ministry,
+             p.accepting_applications,
+             ap.name AS applicant_name, ap.email AS applicant_email,
+             o.id AS assigned_officer_id, o.name AS assigned_officer_name
+      FROM applications a
+      JOIN programmes p ON p.id = a.programme_id
+      JOIN applicants ap ON ap.id = a.applicant_id
+      LEFT JOIN officers o ON o.id = a.assigned_officer_id
+      ORDER BY a.current_status_at DESC
+    `).all();
+  }
   return db.prepare(`
     SELECT a.id, a.code, a.current_status, a.current_status_at, a.created_at,
+           a.flagged_after_close,
            p.code AS programme_code, p.name AS programme_name, p.ministry,
+           p.accepting_applications,
            ap.name AS applicant_name, ap.email AS applicant_email,
            o.id AS assigned_officer_id, o.name AS assigned_officer_name
     FROM applications a
     JOIN programmes p ON p.id = a.programme_id
     JOIN applicants ap ON ap.id = a.applicant_id
     LEFT JOIN officers o ON o.id = a.assigned_officer_id
+    WHERE EXISTS (
+      SELECT 1 FROM officer_programmes op
+      WHERE op.officer_id = ? AND op.programme_id = a.programme_id
+    )
     ORDER BY a.current_status_at DESC
-  `).all();
+  `).all(officerId);
+}
+
+/** Programmes assigned to a given officer. */
+function listProgrammesForOfficer(officerId) {
+  return db.prepare(`
+    SELECT p.id, p.code, p.name
+    FROM programmes p
+    JOIN officer_programmes op ON op.programme_id = p.id
+    WHERE op.officer_id = ?
+    ORDER BY p.name
+  `).all(officerId);
+}
+
+/** True when the officer is allowed to see/manage the given application. */
+function officerCanAccessApplication(officerId, isAdmin, applicationId) {
+  if (isAdmin) return true;
+  const row = db.prepare(`
+    SELECT 1
+    FROM applications a
+    JOIN officer_programmes op
+      ON op.programme_id = a.programme_id AND op.officer_id = ?
+    WHERE a.id = ?
+  `).get(officerId, applicationId);
+  return Boolean(row);
 }
 
 function getApplicationById(id) {
@@ -217,5 +320,7 @@ module.exports = {
   insertStatusEvent,
   getApplicationByCode,
   getApplicationById,
-  listApplicationsForOfficer
+  listApplicationsForOfficer,
+  listProgrammesForOfficer,
+  officerCanAccessApplication
 };

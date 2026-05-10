@@ -30,8 +30,27 @@ The console output prints all the URLs you care about. To start over with fresh 
 
 1. <http://localhost:3030/> — citizen tracker landing. The list of "sample codes" at the bottom is taken from seeded data; click any to see the status page.
 2. <http://localhost:3030/submit-test> — submit a test application. Pick a programme, leave the defaults, hit Submit. You'll be redirected to the confirmation page, and a confirmation email will be written to `mail-out/`.
-3. <http://localhost:3030/officer/login> — sign in as `andrea / andrea` (or `trevor / trevor`, `joy / joy`).
+3. <http://localhost:3030/officer/login> — sign in as `andrea / andrea` (admin) or `trevor / trevor`, `joy / joy` (regular officers).
 4. In the officer console, click any row → the drawer opens with the full timeline. Change the status, add a citizen-facing message, save. A status-change email is written to `mail-out/`. Switch back to the citizen tab and refresh — the new status is there.
+5. As Andrea, click the **Dashboard**, **Users**, **Programmes**, and **Audit log** tabs at the top — these are admin-only and explained below.
+
+## Roles, programme access, and admin tools
+
+There are two officer roles:
+
+- **Admin** (`is_admin = 1`) — sees every application across every programme, plus the Dashboard, Users, Programmes and Audit log tabs. Andrea is the seeded admin.
+- **Officer** (`is_admin = 0`) — sees only applications in programmes they're assigned to. Trevor and Joy default to all six MYSCE programmes; an admin can constrain that.
+
+### Admin tabs
+
+- **Dashboard** — total/open/completed/rejected counts, mean and median days from `received` to `completed` overall and per-programme, p90/min/max for context, plus a per-officer caseload table. Numbers are computed live from the `status_events` table (no scheduled jobs).
+- **Users** — table of all officers with Edit / Programmes / Password actions. "Edit" toggles admin and active flags; "Programmes" sets the per-officer programme access (whole-set replace); "Password" is an admin override (the user is not emailed — share through a secure channel).
+- **Programmes** — add new programmes, edit existing ones, and toggle "accepting applications". When a programme is closed, submissions still come in via the webhook but are flagged "after-close" so officers can spot them. The citizen-facing form list (`GET /api/programmes`) only shows currently accepting programmes.
+- **Audit log** — append-only feed of every meaningful action: logins (success and fail), application status changes, application assignments, intake from the webhook, officer create/update/deactivate/password reset, programme create/update/toggle, and email tests. Filter by action; paginate with "Load more". Each row shows actor, target, before→after diff, and IP.
+
+### Self-protection: admins can't lock everyone out
+
+The PATCH `/api/admin/officers/:id` endpoint refuses to deactivate the calling admin or revoke their own admin flag. To remove an admin, sign in as a different admin (or, in the worst case, set `is_admin = 1` directly in the DB).
 
 ## Where the emails go
 
@@ -163,29 +182,55 @@ The repo ships with a Dockerfile and a `render.yaml` Blueprint, so deployment is
 
 **Watching production.** Render's logs pane shows every email sent (`[mail] submission → ...`) and every status update. The persistent disk also keeps a copy of every email at `/var/data/mail-out/` — accessible via Render's web shell if you need to debug a non-delivery.
 
+## Admin API
+
+All admin endpoints require an active session for an officer with `is_admin = 1`. They return `403` for regular officers and `401` for unauthenticated callers.
+
+```
+GET    /api/admin/officers                    list all officers
+POST   /api/admin/officers                    create officer (auto-grants every programme)
+PATCH  /api/admin/officers/:id                update name / role / is_admin / is_active
+POST   /api/admin/officers/:id/password       admin password reset
+GET    /api/admin/officers/:id/programmes     programme assignments for one officer
+PUT    /api/admin/officers/:id/programmes     replace assignments (whole-set)
+
+GET    /api/admin/programmes                  list programmes with counts and accepting flag
+POST   /api/admin/programmes                  create programme (auto-grants to active officers)
+PATCH  /api/admin/programmes/:id              update + toggle accepting_applications
+
+GET    /api/admin/dashboard                   metrics (counts, time-to-completion, officer load)
+GET    /api/admin/audit-log?limit=50&before=… paginated audit log
+```
+
+The audit log uses keyset pagination: pass the smallest `id` you've seen as `before` to load the next page.
+
 ## Architecture
 
 ```
 application-tracker/
 ├── server.js              Express app, all routes
-├── db.js                  SQLite schema + query helpers
+├── db.js                  SQLite schema + idempotent migrations + query helpers
 ├── codes.js               Reference code generator
-├── auth.js                Officer authentication middleware
-├── notifications.js       Submission + status-change email
+├── auth.js                Officer authentication + requireAdmin middleware
+├── auditLog.js            Audit log helper (logAction, listAuditLog)
+├── notifications.js       Submission + status-change + test email
+├── apikey.js              X-API-Key auth for the form-intake webhook
 ├── seed.js                Sample programmes/officers/applications
 ├── package.json
 ├── data/tracker.db        SQLite database file
 ├── mail-out/              Outgoing emails (one folder per send)
 ├── index.html             Citizen tracker (path-routed SPA)
 ├── confirmation.html      "Application sent" page
-├── officer.html           Officer console
+├── officer.html           Officer console (Cases / Dashboard / Users / Programmes / Audit log)
 ├── officer-login.html     Sign-in page
 ├── submit-test.html       Demo form (calls the webhook)
 ├── pilot-brief.md         Strategic brief
 └── README.md              This file
 ```
 
-The data model has six tables: `programmes`, `applicants`, `applications`, `officers`, `status_events` (append-only timeline), `notifications` (audit log of what we sent). The `status_events` table is the source of truth; `applications.current_status` is a denormalised cache kept in sync inside a transaction whenever a new event is inserted.
+The data model has nine tables: `programmes`, `applicants`, `applications`, `officers`, `status_events` (append-only timeline of status changes), `notifications` (audit of every email we sent), `api_clients` (hashed webhook keys), `officer_programmes` (many-to-many: which officers can see which programmes), and `audit_log` (append-only feed of every meaningful action — the source of truth for the admin Audit log tab). The `status_events` table is the source of truth for application status; `applications.current_status` is a denormalised cache kept in sync inside a transaction whenever a new event is inserted.
+
+Migrations are idempotent: `db.js` checks each new column with `PRAGMA table_info` and only runs `ALTER TABLE ADD COLUMN` if missing, so existing databases on Render upgrade cleanly on next boot without losing data.
 
 ## Pilot decisions worth flagging
 
@@ -210,6 +255,6 @@ When this graduates from pilot to live, these are the items to address:
 - Move the session secret to an environment variable / secret manager.
 - Add HTTPS termination at the load balancer; set the session cookie to `secure: true`.
 - Add the "significant transitions only + 24h throttle" rule to the notification dispatcher.
-- Add an officer-facing audit log view (the `notifications` and `status_events` tables already record everything).
+- Decide audit log retention: the `audit_log` table grows unbounded. Add a periodic prune (e.g. drop entries older than 1 year) or archive to cold storage.
 - Add a "I lost my code" recovery flow that routes to an officer rather than auto-recovering.
 - Decide retention: how long do applications stay in the tracker after the cohort ends?

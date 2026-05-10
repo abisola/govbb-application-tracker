@@ -26,9 +26,8 @@
     font-size: 14px; color: var(--slate-900); background: var(--slate-50);
     -webkit-font-smoothing: antialiased;
     display: grid;
-    grid-template-columns: 240px 1fr;
-    grid-template-rows: 56px 1fr;
-    grid-template-areas: "topbar topbar" "sidenav main";
+    grid-template-rows: 56px 44px 1fr;
+    grid-template-areas: "topbar" "tabbar" "main";
     height: 100vh; overflow: hidden;
   }
   .topbar { grid-area: topbar; background: var(--slate-950); color: #fff; display: flex; align-items: center; padding: 0 20px; gap: 16px; border-bottom: 1px solid var(--slate-800); }
@@ -43,15 +42,30 @@
   .topbar button.linklike { background: none; border: 0; color: var(--slate-300); cursor: pointer; font: inherit; font-size: 13px; padding: 0; }
   .topbar button.linklike:hover { color: #fff; }
 
-  .sidenav { grid-area: sidenav; background: var(--slate-900); color: var(--slate-300); padding: 16px 0; overflow-y: auto; }
+  /* Top-level tab bar */
+  .tabbar { grid-area: tabbar; background: #fff; border-bottom: 1px solid var(--slate-200); display: flex; align-items: stretch; padding: 0 16px; overflow-x: auto; }
+  .tabbar button { background: none; border: 0; padding: 0 16px; font: inherit; font-size: 13.5px; color: var(--slate-700); cursor: pointer; height: 100%; border-bottom: 3px solid transparent; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .tabbar button:hover { color: var(--slate-900); }
+  .tabbar button.is-active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+  .tabbar .admin-only[hidden] { display: none; }
+  .badge-admin { background: var(--accent-soft); color: var(--accent); border-radius: 4px; padding: 2px 7px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+
+  main { grid-area: main; overflow: hidden; display: grid; grid-template-columns: 1fr; }
+  /* Cases view re-introduces the per-status sidebar */
+  .view { display: none; height: 100%; overflow: hidden; }
+  .view.is-active { display: grid; grid-template-rows: auto 1fr; }
+
+  /* Cases view layout */
+  .cases-grid { display: grid; grid-template-columns: 240px 1fr; height: 100%; overflow: hidden; }
+  .sidenav { background: var(--slate-900); color: var(--slate-300); padding: 16px 0; overflow-y: auto; }
   .sidenav h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--slate-500); margin: 18px 20px 8px; }
   .sidenav a { display: flex; align-items: center; justify-content: space-between; padding: 8px 20px; color: var(--slate-300); text-decoration: none; font-size: 14px; border-left: 3px solid transparent; cursor: pointer; }
   .sidenav a:hover { background: var(--slate-800); color: #fff; }
   .sidenav a.is-active { background: var(--slate-800); color: #fff; border-left-color: #ffc726; font-weight: 600; }
   .sidenav .count { background: var(--slate-700); color: var(--slate-200); font-size: 11px; padding: 2px 7px; border-radius: 999px; font-weight: 600; }
   .sidenav a.is-active .count { background: #ffc726; color: #000; }
+  .cases-main { overflow: hidden; display: flex; flex-direction: column; background: var(--slate-50); }
 
-  main { grid-area: main; overflow: hidden; display: flex; flex-direction: column; background: var(--slate-50); }
   .page-head { padding: 16px 24px; border-bottom: 1px solid var(--slate-200); background: #fff; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
   .page-head h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
   .page-head .sub { color: var(--slate-500); font-size: 13px; margin-top: 2px; }
@@ -59,6 +73,9 @@
   .btn:hover { background: var(--slate-100); }
   .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   .btn-primary:hover { background: #001b5c; }
+  .btn-danger { background: #b91c1c; border-color: #b91c1c; color: #fff; }
+  .btn-danger:hover { background: #991b1b; }
+  .btn-sm { padding: 4px 9px; font-size: 12.5px; }
   .btn:focus-visible { outline: 3px solid #ffc726; outline-offset: 1px; }
 
   .filters { padding: 12px 24px; background: #fff; border-bottom: 1px solid var(--slate-200); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
@@ -74,20 +91,23 @@
   .filter-clear:hover { color: var(--slate-900); }
 
   .table-wrap { flex: 1; overflow: auto; padding: 0 24px 24px; }
-  table.caseload { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--slate-200); border-radius: 8px; overflow: hidden; margin-top: 16px; font-size: 13.5px; }
-  table.caseload thead th { text-align: left; background: var(--slate-100); border-bottom: 1px solid var(--slate-200); color: var(--slate-700); font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 14px; cursor: pointer; user-select: none; white-space: nowrap; }
-  table.caseload thead th:hover { background: var(--slate-200); }
-  table.caseload thead th .arrow { color: var(--slate-400); margin-left: 4px; }
-  table.caseload thead th.is-sorted .arrow { color: var(--slate-900); }
-  table.caseload tbody tr { border-bottom: 1px solid var(--slate-100); cursor: pointer; }
-  table.caseload tbody tr:hover { background: var(--slate-50); }
-  table.caseload tbody tr.is-selected { background: var(--accent-soft); }
-  table.caseload td { padding: 12px 14px; vertical-align: middle; color: var(--slate-800); }
+  table.t { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--slate-200); border-radius: 8px; overflow: hidden; margin-top: 16px; font-size: 13.5px; }
+  table.t thead th { text-align: left; background: var(--slate-100); border-bottom: 1px solid var(--slate-200); color: var(--slate-700); font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 14px; user-select: none; white-space: nowrap; }
+  table.t.sortable thead th { cursor: pointer; }
+  table.t.sortable thead th:hover { background: var(--slate-200); }
+  table.t thead th .arrow { color: var(--slate-400); margin-left: 4px; }
+  table.t thead th.is-sorted .arrow { color: var(--slate-900); }
+  table.t tbody tr { border-bottom: 1px solid var(--slate-100); }
+  table.t.row-click tbody tr { cursor: pointer; }
+  table.t.row-click tbody tr:hover { background: var(--slate-50); }
+  table.t tbody tr.is-selected { background: var(--accent-soft); }
+  table.t td { padding: 12px 14px; vertical-align: middle; color: var(--slate-800); }
   td.code { font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace; font-weight: 500; color: var(--slate-900); font-size: 12.5px; white-space: nowrap; }
   td.applicant { font-weight: 600; }
   td.dim { color: var(--slate-500); }
   td.age { font-variant-numeric: tabular-nums; white-space: nowrap; }
   td.age.is-old { color: var(--red); font-weight: 600; }
+  td.actions { white-space: nowrap; text-align: right; }
 
   .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
   .pill .dot { width: 7px; height: 7px; border-radius: 999px; }
@@ -103,7 +123,12 @@
   .pill[data-s="rejected"] .dot { background: var(--red); }
   .pill[data-s="completed"]     { background: var(--grey-soft);   color: var(--slate-700); border-color: var(--slate-300); }
   .pill[data-s="completed"] .dot { background: var(--slate-500); }
+  .pill-flag { background: var(--amber-soft); color: var(--amber); border-color: #fde68a; }
+  .pill-closed { background: var(--red-soft); color: var(--red); border-color: #fecaca; }
+  .pill-on { background: var(--green-soft); color: var(--green); border-color: #a7f3d0; }
+  .pill-off { background: var(--grey-soft); color: var(--slate-700); border-color: var(--slate-300); }
 
+  /* Drawer */
   .drawer { position: fixed; top: 56px; right: 0; bottom: 0; width: min(640px, 100vw); background: #fff; border-left: 1px solid var(--slate-200); box-shadow: -10px 0 30px rgba(15, 23, 42, 0.08); transform: translateX(100%); transition: transform .25s ease; overflow-y: auto; z-index: 30; }
   .drawer.is-open { transform: translateX(0); }
   .drawer-backdrop { position: fixed; inset: 56px 0 0 0; background: rgba(15, 23, 42, .25); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 20; }
@@ -121,8 +146,6 @@
   .kv dt { color: var(--slate-500); }
   .kv dd { margin: 0; color: var(--slate-900); font-weight: 500; }
 
-  /* Form data renderer — generic key/value tree; styled to look like a
-     compact spec sheet so officers can scan it quickly. */
   .form-data { margin: 0; font-size: 13.5px; }
   .form-data dl { display: grid; grid-template-columns: 180px 1fr; row-gap: 6px; column-gap: 12px; margin: 0; }
   .form-data dt { color: var(--slate-500); font-weight: 500; padding-top: 1px; }
@@ -135,12 +158,15 @@
   .field { margin-bottom: 14px; }
   .field label { display: block; font-size: 13px; font-weight: 600; color: var(--slate-800); margin-bottom: 4px; }
   .field .hint { color: var(--slate-500); font-size: 12.5px; margin-bottom: 6px; }
-  .field input[type=text], .field textarea, .field select { width: 100%; border: 1px solid var(--slate-300); border-radius: 6px; padding: 8px 10px; font-size: 13.5px; font-family: inherit; background: #fff; }
+  .field input[type=text], .field input[type=email], .field input[type=password], .field input[type=number], .field textarea, .field select { width: 100%; border: 1px solid var(--slate-300); border-radius: 6px; padding: 8px 10px; font-size: 13.5px; font-family: inherit; background: #fff; }
   .field textarea { min-height: 80px; resize: vertical; }
   .field input:focus, .field textarea:focus, .field select:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+  .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--slate-800); }
   .form-actions { display: flex; gap: 8px; align-items: center; }
   .saved-flash { background: var(--green-soft); color: var(--green); border: 1px solid #a7f3d0; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; display: none; }
   .saved-flash.is-on { display: block; }
+  .error-flash { background: var(--red-soft); color: var(--red); border: 1px solid #fecaca; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; }
 
   .activity { margin: 0; padding: 0; list-style: none; }
   .activity li { position: relative; padding-left: 22px; padding-bottom: 14px; }
@@ -159,9 +185,40 @@
 
   .results-bar { padding: 10px 24px; font-size: 13px; color: var(--slate-700); display: flex; gap: 12px; align-items: center; }
   .results-bar strong { color: var(--slate-900); }
-
   .empty { padding: 32px; text-align: center; color: var(--slate-500); background: #fff; border: 1px dashed var(--slate-300); border-radius: 8px; margin: 16px 0; }
   .loading { padding: 32px; text-align: center; color: var(--slate-500); font-size: 13px; }
+
+  /* Modal */
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); z-index: 50; display: none; align-items: center; justify-content: center; padding: 24px; }
+  .modal-backdrop.is-open { display: flex; }
+  .modal { background: #fff; border-radius: 8px; width: min(560px, 100%); max-height: 90vh; overflow: auto; box-shadow: 0 20px 60px rgba(15,23,42,.3); }
+  .modal-head { padding: 18px 24px; border-bottom: 1px solid var(--slate-200); display: flex; justify-content: space-between; align-items: center; }
+  .modal-head h2 { margin: 0; font-size: 17px; font-weight: 700; }
+  .modal-body { padding: 18px 24px; }
+  .modal-foot { padding: 14px 24px; border-top: 1px solid var(--slate-200); display: flex; justify-content: flex-end; gap: 8px; }
+
+  /* Dashboard */
+  .dash-wrap { padding: 24px; overflow: auto; }
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .stat { background: #fff; border: 1px solid var(--slate-200); border-radius: 8px; padding: 16px 18px; }
+  .stat .label { font-size: 11.5px; color: var(--slate-500); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600; }
+  .stat .value { font-size: 28px; font-weight: 700; letter-spacing: -0.02em; margin-top: 6px; color: var(--slate-900); font-variant-numeric: tabular-nums; }
+  .stat .sub { font-size: 12.5px; color: var(--slate-500); margin-top: 2px; }
+  .panel { background: #fff; border: 1px solid var(--slate-200); border-radius: 8px; margin-bottom: 24px; }
+  .panel-head { padding: 14px 18px; border-bottom: 1px solid var(--slate-200); display: flex; justify-content: space-between; align-items: center; }
+  .panel-head h2 { margin: 0; font-size: 14px; font-weight: 700; letter-spacing: -0.01em; }
+  .panel-head .stamp { font-size: 12px; color: var(--slate-500); }
+  .panel-body { padding: 0; }
+  .panel-body table.t { margin: 0; border: 0; border-radius: 0; }
+
+  .audit-list { background: #fff; border: 1px solid var(--slate-200); border-radius: 8px; }
+  .audit-row { padding: 12px 18px; border-bottom: 1px solid var(--slate-100); display: grid; grid-template-columns: 160px 1fr; gap: 18px; font-size: 13px; }
+  .audit-row:last-child { border-bottom: 0; }
+  .audit-row .when { color: var(--slate-500); font-variant-numeric: tabular-nums; font-size: 12px; }
+  .audit-row .what { }
+  .audit-row .what .action { font-weight: 600; color: var(--slate-900); }
+  .audit-row .what .who { color: var(--slate-700); }
+  .audit-row .diff { margin-top: 6px; font-size: 12px; color: var(--slate-600); background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 4px; padding: 6px 8px; font-family: 'JetBrains Mono', monospace; white-space: pre-wrap; }
 </style>
 </head>
 <body>
@@ -175,80 +232,176 @@
   <div class="me">
     <span class="me-avatar" id="me-initial">…</span>
     <div>
-      <div style="font-weight:600;color:#fff;" id="me-name">Loading…</div>
+      <div style="font-weight:600;color:#fff;display:flex;align-items:center;gap:6px;">
+        <span id="me-name">Loading…</span>
+        <span class="badge-admin" id="me-admin-badge" hidden>Admin</span>
+      </div>
       <div style="color:var(--slate-400);font-size:11.5px;" id="me-role">—</div>
     </div>
   </div>
 </header>
 
-<aside class="sidenav">
-  <h3>Caseload</h3>
-  <a class="is-active" data-filter-status="all">All applications <span class="count" id="c-all">0</span></a>
-  <a data-filter-status="received">Received <span class="count" id="c-received">0</span></a>
-  <a data-filter-status="under_review">Under review <span class="count" id="c-under_review">0</span></a>
-  <a data-filter-status="action_needed">Action needed <span class="count" id="c-action_needed">0</span></a>
-  <a data-filter-status="approved">Approved <span class="count" id="c-approved">0</span></a>
-  <a data-filter-status="rejected">Rejected <span class="count" id="c-rejected">0</span></a>
-  <a data-filter-status="completed">Completed <span class="count" id="c-completed">0</span></a>
-
-  <h3>Mine</h3>
-  <a data-filter-mine="1">Assigned to me <span class="count" id="c-mine">0</span></a>
-</aside>
+<nav class="tabbar" id="tabbar">
+  <button data-view="cases" class="is-active">Cases</button>
+  <button data-view="dashboard" class="admin-only" hidden>Dashboard</button>
+  <button data-view="users"     class="admin-only" hidden>Users</button>
+  <button data-view="programmes" class="admin-only" hidden>Programmes</button>
+  <button data-view="audit"     class="admin-only" hidden>Audit log</button>
+</nav>
 
 <main>
-  <div class="page-head">
-    <div>
-      <h1 id="page-title">All applications</h1>
-      <div class="sub" id="page-sub">Showing every application across all programmes.</div>
-    </div>
-    <div style="display:flex;gap:8px;">
-      <a class="btn" href="/submit-test" target="_blank">Submit a test application ↗</a>
-    </div>
-  </div>
 
-  <div class="filters">
-    <div class="search-box">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
-      <input id="q" type="search" placeholder="Search code, applicant or programme…" autocomplete="off">
+  <!-- ========== Cases view ========== -->
+  <section class="view is-active" data-view="cases">
+    <div class="cases-grid">
+      <aside class="sidenav">
+        <h3>Caseload</h3>
+        <a class="is-active" data-filter-status="all">All applications <span class="count" id="c-all">0</span></a>
+        <a data-filter-status="received">Received <span class="count" id="c-received">0</span></a>
+        <a data-filter-status="under_review">Under review <span class="count" id="c-under_review">0</span></a>
+        <a data-filter-status="action_needed">Action needed <span class="count" id="c-action_needed">0</span></a>
+        <a data-filter-status="approved">Approved <span class="count" id="c-approved">0</span></a>
+        <a data-filter-status="rejected">Rejected <span class="count" id="c-rejected">0</span></a>
+        <a data-filter-status="completed">Completed <span class="count" id="c-completed">0</span></a>
+
+        <h3>Mine</h3>
+        <a data-filter-mine="1">Assigned to me <span class="count" id="c-mine">0</span></a>
+
+        <h3>Flags</h3>
+        <a data-filter-flag="1">After-close submissions <span class="count" id="c-flagged">0</span></a>
+      </aside>
+
+      <div class="cases-main">
+        <div class="page-head">
+          <div>
+            <h1 id="page-title">All applications</h1>
+            <div class="sub" id="page-sub">Showing every application across all programmes you can access.</div>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <a class="btn" href="/submit-test" target="_blank">Submit a test application ↗</a>
+          </div>
+        </div>
+
+        <div class="filters">
+          <div class="search-box">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input id="q" type="search" placeholder="Search code, applicant or programme…" autocomplete="off">
+          </div>
+          <select id="f-programme" class="filter-select" aria-label="Filter by programme">
+            <option value="">All programmes</option>
+          </select>
+          <select id="f-officer" class="filter-select" aria-label="Filter by assigned officer">
+            <option value="">All officers</option>
+          </select>
+          <select id="f-age" class="filter-select" aria-label="Filter by age">
+            <option value="">Any age</option>
+            <option value="3">Older than 3 days</option>
+            <option value="7">Older than 7 days</option>
+            <option value="14">Older than 14 days</option>
+          </select>
+          <button type="button" class="filter-clear" id="clear-filters">Clear filters</button>
+        </div>
+
+        <div class="results-bar">
+          <span><strong id="r-shown">0</strong> of <strong id="r-total">0</strong> applications</span>
+        </div>
+
+        <div class="table-wrap">
+          <table class="t sortable row-click" aria-label="Applications">
+            <thead>
+              <tr>
+                <th data-sort="code">Code <span class="arrow">↕</span></th>
+                <th data-sort="programme_name">Programme <span class="arrow">↕</span></th>
+                <th data-sort="applicant_name">Applicant <span class="arrow">↕</span></th>
+                <th data-sort="current_status">Status <span class="arrow">↕</span></th>
+                <th data-sort="assigned_officer_name">Assigned to <span class="arrow">↕</span></th>
+                <th data-sort="current_status_at">Updated <span class="arrow">↕</span></th>
+                <th data-sort="age">Age <span class="arrow">↕</span></th>
+              </tr>
+            </thead>
+            <tbody id="tbody"><tr><td colspan="7" class="loading">Loading caseload…</td></tr></tbody>
+          </table>
+          <div class="empty" id="empty" hidden>No applications match these filters.</div>
+        </div>
+      </div>
     </div>
-    <select id="f-programme" class="filter-select" aria-label="Filter by programme">
-      <option value="">All programmes</option>
-    </select>
-    <select id="f-officer" class="filter-select" aria-label="Filter by assigned officer">
-      <option value="">All officers</option>
-    </select>
-    <select id="f-age" class="filter-select" aria-label="Filter by age">
-      <option value="">Any age</option>
-      <option value="3">Older than 3 days</option>
-      <option value="7">Older than 7 days</option>
-      <option value="14">Older than 14 days</option>
-    </select>
-    <button type="button" class="filter-clear" id="clear-filters">Clear filters</button>
-  </div>
+  </section>
 
-  <div class="results-bar">
-    <span><strong id="r-shown">0</strong> of <strong id="r-total">0</strong> applications</span>
-  </div>
+  <!-- ========== Dashboard view ========== -->
+  <section class="view" data-view="dashboard">
+    <div class="page-head">
+      <div>
+        <h1>Dashboard</h1>
+        <div class="sub">Caseload health and time-to-completion across programmes.</div>
+      </div>
+      <button class="btn btn-sm" id="dash-refresh">Refresh</button>
+    </div>
+    <div class="dash-wrap" id="dash-wrap"><div class="loading">Loading…</div></div>
+  </section>
 
-  <div class="table-wrap">
-    <table class="caseload" aria-label="Applications">
-      <thead>
-        <tr>
-          <th data-sort="code">Code <span class="arrow">↕</span></th>
-          <th data-sort="programme_name">Programme <span class="arrow">↕</span></th>
-          <th data-sort="applicant_name">Applicant <span class="arrow">↕</span></th>
-          <th data-sort="current_status">Status <span class="arrow">↕</span></th>
-          <th data-sort="assigned_officer_name">Assigned to <span class="arrow">↕</span></th>
-          <th data-sort="current_status_at">Updated <span class="arrow">↕</span></th>
-          <th data-sort="age">Age <span class="arrow">↕</span></th>
-        </tr>
-      </thead>
-      <tbody id="tbody"><tr><td colspan="7" class="loading">Loading caseload…</td></tr></tbody>
-    </table>
-    <div class="empty" id="empty" hidden>No applications match these filters.</div>
-  </div>
+  <!-- ========== Users view ========== -->
+  <section class="view" data-view="users">
+    <div class="page-head">
+      <div>
+        <h1>Users</h1>
+        <div class="sub">Officers who can sign in to the console. Admin can add new users and adjust access.</div>
+      </div>
+      <button class="btn btn-primary" id="user-new">+ Add user</button>
+    </div>
+    <div class="table-wrap">
+      <table class="t" aria-label="Officers">
+        <thead><tr>
+          <th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Admin?</th><th>Active?</th><th>Programmes</th><th></th>
+        </tr></thead>
+        <tbody id="users-tbody"><tr><td colspan="8" class="loading">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ========== Programmes view ========== -->
+  <section class="view" data-view="programmes">
+    <div class="page-head">
+      <div>
+        <h1>Programmes</h1>
+        <div class="sub">Add programmes, change details, and turn intake on or off.</div>
+      </div>
+      <button class="btn btn-primary" id="prog-new">+ Add programme</button>
+    </div>
+    <div class="table-wrap">
+      <table class="t" aria-label="Programmes">
+        <thead><tr>
+          <th>Code</th><th>Name</th><th>Ministry</th><th>SLA (days)</th><th>Open / Total</th><th>Accepting?</th><th></th>
+        </tr></thead>
+        <tbody id="prog-tbody"><tr><td colspan="7" class="loading">Loading…</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ========== Audit log view ========== -->
+  <section class="view" data-view="audit">
+    <div class="page-head">
+      <div>
+        <h1>Audit log</h1>
+        <div class="sub">Every meaningful action in the system. Append-only.</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <select id="audit-action" class="filter-select" aria-label="Filter by action">
+          <option value="">All actions</option>
+        </select>
+        <button class="btn btn-sm" id="audit-refresh">Refresh</button>
+      </div>
+    </div>
+    <div style="padding:0 24px 24px;overflow:auto;">
+      <div class="audit-list" id="audit-list"><div class="loading">Loading…</div></div>
+      <div style="margin:14px 0; text-align:center;">
+        <button class="btn btn-sm" id="audit-more" hidden>Load more</button>
+      </div>
+    </div>
+  </section>
+
 </main>
 
+<!-- Drawer for the Cases view -->
 <div class="drawer-backdrop" id="backdrop"></div>
 <aside class="drawer" id="drawer" aria-hidden="true" aria-labelledby="d-title">
   <div class="drawer-head">
@@ -261,6 +414,10 @@
     </button>
   </div>
   <div class="drawer-body">
+
+    <div class="drawer-section" id="d-flag-section" hidden>
+      <span class="pill pill-flag"><span class="dot" style="background:var(--amber);"></span>Submitted after the programme stopped accepting applications</span>
+    </div>
 
     <div class="drawer-section">
       <h3>Summary</h3>
@@ -301,7 +458,7 @@
         </div>
         <div class="field">
           <label for="d-message">Message to citizen <span style="color:var(--slate-500);font-weight:500;">(shown on the tracker, sent in the email)</span></label>
-          <div class="hint">Keep it short. Plain English. Tell them what to do, not what we’re doing.</div>
+          <div class="hint">Keep it short. Plain English. Tell them what to do, not what we're doing.</div>
           <textarea id="d-message" placeholder="e.g. We need an updated CV. Please upload it via the link in your email."></textarea>
         </div>
         <div class="form-actions">
@@ -321,6 +478,20 @@
   </div>
 </aside>
 
+<!-- Generic modal -->
+<div class="modal-backdrop" id="modal-backdrop">
+  <div class="modal" role="dialog" aria-labelledby="modal-title">
+    <div class="modal-head">
+      <h2 id="modal-title">—</h2>
+      <button class="drawer-close" id="modal-close" aria-label="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot" id="modal-foot"></div>
+  </div>
+</div>
+
 <script>
 const STATUS_LABELS = {
   received: 'Received', under_review: 'Under review', action_needed: 'Action needed',
@@ -329,122 +500,130 @@ const STATUS_LABELS = {
 
 let me = null;
 const state = {
-  filterStatus: 'all', filterMine: false,
+  view: 'cases',
+  filterStatus: 'all', filterMine: false, filterFlagged: false,
   filterProgramme: '', filterOfficer: '', filterAge: '',
   search: '', sortBy: 'current_status_at', sortDir: 'desc',
   selectedId: null,
-  applications: []
+  applications: [],
+  // Admin caches
+  officers: [],
+  programmes: [],
+  audit: { entries: [], hasMore: false, action: '' }
 };
 
 /* =========================================================
-   API
+   Tab switching
    ========================================================= */
-async function fetchMe() {
-  const r = await fetch('/api/me');
-  if (r.status === 401) { location.href = '/officer/login'; return null; }
-  const data = await r.json();
-  return data.officer;
+function switchView(view) {
+  state.view = view;
+  document.querySelectorAll('#tabbar button').forEach(b => b.classList.toggle('is-active', b.dataset.view === view));
+  document.querySelectorAll('main > .view').forEach(s => s.classList.toggle('is-active', s.dataset.view === view));
+  if (view === 'dashboard') loadDashboard();
+  if (view === 'users') loadUsers();
+  if (view === 'programmes') loadProgrammes();
+  if (view === 'audit') loadAuditLog(true);
 }
-async function fetchApplications() {
-  const r = await fetch('/api/officer/applications');
-  if (r.status === 401) { location.href = '/officer/login'; return []; }
-  const data = await r.json();
-  return data.applications;
-}
-async function fetchApplication(id) {
-  const r = await fetch('/api/officer/applications/' + id);
-  if (!r.ok) return null;
-  const data = await r.json();
-  return data.application;
-}
-async function patchApplication(id, body) {
-  const r = await fetch('/api/officer/applications/' + id, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  if (!r.ok) throw new Error('Update failed');
-  const data = await r.json();
-  return data.application;
-}
-async function assignToMe(id) {
-  const r = await fetch('/api/officer/applications/' + id + '/assign-me', { method: 'POST' });
-  if (!r.ok) throw new Error('Assign failed');
-  const data = await r.json();
-  return data.application;
+document.getElementById('tabbar').addEventListener('click', e => {
+  const btn = e.target.closest('button[data-view]');
+  if (btn) switchView(btn.dataset.view);
+});
+
+/* =========================================================
+   API helpers
+   ========================================================= */
+async function api(method, url, body) {
+  const init = { method, headers: {} };
+  if (body !== undefined) {
+    init.headers['Content-Type'] = 'application/json';
+    init.body = JSON.stringify(body);
+  }
+  const r = await fetch(url, init);
+  if (r.status === 401) { location.href = '/officer/login'; throw new Error('unauth'); }
+  if (!r.ok) {
+    let detail = '';
+    try { detail = (await r.json()).error || ''; } catch (_) {}
+    throw new Error(detail || `${method} ${url} → ${r.status}`);
+  }
+  if (r.status === 204) return null;
+  return r.json();
 }
 
 /* =========================================================
    Boot
    ========================================================= */
 async function boot() {
-  me = await fetchMe();
-  if (!me) return;
+  try {
+    const data = await api('GET', '/api/me');
+    me = data.officer;
+  } catch (_) { return; }
   document.getElementById('me-name').textContent = me.name;
   document.getElementById('me-role').textContent = me.role;
   document.getElementById('me-initial').textContent = me.name.split(/\s+/).map(p => p[0]).slice(0,2).join('');
+  document.getElementById('me-admin-badge').hidden = !me.is_admin;
+  document.querySelectorAll('.admin-only').forEach(el => { el.hidden = !me.is_admin; });
 
   document.getElementById('signout').addEventListener('click', async () => {
     await fetch('/api/officer/logout', { method: 'POST' });
     location.href = '/officer/login';
   });
 
-  await refresh();
+  await refreshCases();
 }
 
-async function refresh() {
-  state.applications = await fetchApplications();
-  render();
+async function refreshCases() {
+  const data = await api('GET', '/api/officer/applications');
+  state.applications = data.applications;
+  renderCases();
 }
 
 /* =========================================================
-   Side nav
+   Cases — sidenav, filters, sort, table, drawer
    ========================================================= */
 document.querySelectorAll('.sidenav a[data-filter-status]').forEach(a => {
   a.addEventListener('click', () => {
     document.querySelectorAll('.sidenav a').forEach(x => x.classList.remove('is-active'));
     a.classList.add('is-active');
     state.filterStatus = a.dataset.filterStatus;
-    state.filterMine = false;
-    render();
+    state.filterMine = false; state.filterFlagged = false;
+    renderCases();
   });
 });
 document.querySelector('.sidenav a[data-filter-mine]').addEventListener('click', e => {
   document.querySelectorAll('.sidenav a').forEach(x => x.classList.remove('is-active'));
   e.currentTarget.classList.add('is-active');
-  state.filterMine = true;
-  state.filterStatus = 'all';
-  render();
+  state.filterMine = true; state.filterFlagged = false; state.filterStatus = 'all';
+  renderCases();
+});
+document.querySelector('.sidenav a[data-filter-flag]').addEventListener('click', e => {
+  document.querySelectorAll('.sidenav a').forEach(x => x.classList.remove('is-active'));
+  e.currentTarget.classList.add('is-active');
+  state.filterFlagged = true; state.filterMine = false; state.filterStatus = 'all';
+  renderCases();
 });
 
-/* =========================================================
-   Filters
-   ========================================================= */
-document.getElementById('q').addEventListener('input', e => { state.search = e.target.value.toLowerCase(); render(); });
-document.getElementById('f-programme').addEventListener('change', e => { state.filterProgramme = e.target.value; render(); });
-document.getElementById('f-officer').addEventListener('change', e => { state.filterOfficer = e.target.value; render(); });
-document.getElementById('f-age').addEventListener('change', e => { state.filterAge = e.target.value; render(); });
+document.getElementById('q').addEventListener('input', e => { state.search = e.target.value.toLowerCase(); renderCases(); });
+document.getElementById('f-programme').addEventListener('change', e => { state.filterProgramme = e.target.value; renderCases(); });
+document.getElementById('f-officer').addEventListener('change', e => { state.filterOfficer = e.target.value; renderCases(); });
+document.getElementById('f-age').addEventListener('change', e => { state.filterAge = e.target.value; renderCases(); });
 document.getElementById('clear-filters').addEventListener('click', () => {
   state.search = ''; state.filterProgramme = ''; state.filterOfficer = ''; state.filterAge = '';
   document.getElementById('q').value = '';
   document.getElementById('f-programme').value = '';
   document.getElementById('f-officer').value = '';
   document.getElementById('f-age').value = '';
-  render();
+  renderCases();
 });
 
-document.querySelectorAll('thead th[data-sort]').forEach(th => {
+document.querySelectorAll('section[data-view="cases"] thead th[data-sort]').forEach(th => {
   th.addEventListener('click', () => {
     const k = th.dataset.sort;
     if (state.sortBy === k) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
     else { state.sortBy = k; state.sortDir = 'asc'; }
-    render();
+    renderCases();
   });
 });
 
-/* =========================================================
-   Drawer
-   ========================================================= */
 const drawer = document.getElementById('drawer');
 const backdrop = document.getElementById('backdrop');
 async function openDrawer(id) {
@@ -463,29 +642,23 @@ function closeDrawer() {
 }
 document.getElementById('drawer-close').addEventListener('click', closeDrawer);
 backdrop.addEventListener('click', closeDrawer);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeDrawer(); closeModal(); } });
 
-/* =========================================================
-   Render
-   ========================================================= */
 function lastUpdate(a) { return a.current_status_at || a.created_at; }
 function ageDays(a) {
   const t = String(lastUpdate(a)).replace('T',' ').split(' ')[0];
   const d = new Date(t + 'T00:00:00');
-  // We don't fix "today" any more — the clock now matters.
   const today = new Date();
   return Math.max(0, Math.floor((today - d) / (1000 * 60 * 60 * 24)));
 }
 
-function render() {
+function renderCases() {
   const data = state.applications;
 
   const programmes = [...new Set(data.map(a => a.programme_name))].sort();
   const officers = [...new Set(data.map(a => a.assigned_officer_name).filter(Boolean))].sort();
-  const sSel = document.getElementById('f-programme');
-  sSel.innerHTML = '<option value="">All programmes</option>' + programmes.map(s => `<option ${s === state.filterProgramme ? 'selected' : ''}>${s}</option>`).join('');
-  const oSel = document.getElementById('f-officer');
-  oSel.innerHTML = '<option value="">All officers</option>' + officers.map(s => `<option ${s === state.filterOfficer ? 'selected' : ''}>${s}</option>`).join('') + `<option value="__none" ${state.filterOfficer === '__none' ? 'selected' : ''}>Unassigned</option>`;
+  document.getElementById('f-programme').innerHTML = '<option value="">All programmes</option>' + programmes.map(s => `<option ${s === state.filterProgramme ? 'selected' : ''}>${s}</option>`).join('');
+  document.getElementById('f-officer').innerHTML = '<option value="">All officers</option>' + officers.map(s => `<option ${s === state.filterOfficer ? 'selected' : ''}>${s}</option>`).join('') + `<option value="__none" ${state.filterOfficer === '__none' ? 'selected' : ''}>Unassigned</option>`;
 
   document.getElementById('c-all').textContent = data.length;
   Object.keys(STATUS_LABELS).forEach(s => {
@@ -493,8 +666,10 @@ function render() {
     if (el) el.textContent = data.filter(a => a.current_status === s).length;
   });
   document.getElementById('c-mine').textContent = data.filter(a => a.assigned_officer_name === (me && me.name)).length;
+  document.getElementById('c-flagged').textContent = data.filter(a => a.flagged_after_close).length;
 
   let rows = data.slice();
+  if (state.filterFlagged) rows = rows.filter(a => a.flagged_after_close);
   if (state.filterStatus && state.filterStatus !== 'all') rows = rows.filter(a => a.current_status === state.filterStatus);
   if (state.filterMine) rows = rows.filter(a => a.assigned_officer_name === (me && me.name));
   if (state.filterProgramme) rows = rows.filter(a => a.programme_name === state.filterProgramme);
@@ -519,7 +694,7 @@ function render() {
     return 0;
   });
 
-  document.querySelectorAll('thead th').forEach(th => {
+  document.querySelectorAll('section[data-view="cases"] thead th').forEach(th => {
     th.classList.toggle('is-sorted', th.dataset.sort === state.sortBy);
     const a = th.querySelector('.arrow');
     if (a) a.textContent = th.dataset.sort === state.sortBy ? (state.sortDir === 'asc' ? '↑' : '↓') : '↕';
@@ -530,9 +705,13 @@ function render() {
   if (state.filterMine) {
     document.getElementById('page-title').textContent = 'Assigned to me';
     document.getElementById('page-sub').textContent = `Applications currently assigned to ${me ? me.name : 'you'}.`;
+  } else if (state.filterFlagged) {
+    document.getElementById('page-title').textContent = 'After-close submissions';
+    document.getElementById('page-sub').textContent = 'Applications submitted after the programme stopped accepting applications.';
   } else {
     document.getElementById('page-title').textContent = titles[state.filterStatus] || 'All applications';
-    const subs = { all: 'Showing every application across all programmes.', received: 'New applications waiting to be picked up.',
+    const subs = { all: me && me.is_admin ? 'Showing every application across all programmes.' : 'Applications across the programmes you can access.',
+      received: 'New applications waiting to be picked up.',
       under_review: 'Applications an officer is actively working on.', action_needed: 'Applications paused while we wait for the citizen.',
       approved: 'Approved decisions awaiting delivery or starting on the programme.', rejected: 'Decisions that were not approved.', completed: 'Closed cases — service delivered.' };
     document.getElementById('page-sub').textContent = subs[state.filterStatus] || subs.all;
@@ -545,10 +724,11 @@ function render() {
   tbody.innerHTML = rows.map(a => {
     const age = ageDays(a);
     const ageCls = (age > 7 && (a.current_status === 'received' || a.current_status === 'under_review' || a.current_status === 'action_needed')) ? 'is-old' : '';
+    const flag = a.flagged_after_close ? `<span class="pill pill-flag" style="margin-left:6px;font-size:11px;">After-close</span>` : '';
     return `
       <tr data-id="${a.id}" class="${a.id === state.selectedId ? 'is-selected' : ''}">
         <td class="code">${a.code}</td>
-        <td>${escapeHtml(a.programme_name)}</td>
+        <td>${escapeHtml(a.programme_name)}${flag}</td>
         <td class="applicant">${escapeHtml(a.applicant_name)}</td>
         <td><span class="pill" data-s="${a.current_status}"><span class="dot"></span>${STATUS_LABELS[a.current_status] || a.current_status}</span></td>
         <td class="${a.assigned_officer_name ? '' : 'dim'}">${a.assigned_officer_name || '— Unassigned —'}</td>
@@ -564,7 +744,8 @@ function render() {
 
 async function renderDrawer() {
   if (!state.selectedId) return;
-  const app = await fetchApplication(state.selectedId);
+  const data = await api('GET', '/api/officer/applications/' + state.selectedId);
+  const app = data.application;
   if (!app) { closeDrawer(); return; }
 
   document.getElementById('d-title').textContent = app.applicant_name;
@@ -575,6 +756,7 @@ async function renderDrawer() {
   document.getElementById('d-phone').textContent = app.applicant_phone || '—';
   document.getElementById('d-submitted').textContent = formatDate(app.created_at);
   document.getElementById('d-assigned').textContent = app.assigned_officer_name || '— Unassigned —';
+  document.getElementById('d-flag-section').hidden = !app.flagged_after_close;
 
   const pill = document.getElementById('d-pill');
   pill.dataset.s = app.current_status;
@@ -605,29 +787,532 @@ document.getElementById('d-form').addEventListener('submit', async e => {
   e.preventDefault();
   if (!state.selectedId) return;
   try {
-    await patchApplication(state.selectedId, {
+    await api('PATCH', '/api/officer/applications/' + state.selectedId, {
       status: document.getElementById('d-newstatus').value,
       citizen_message: document.getElementById('d-message').value,
       internal_note: document.getElementById('d-internal').value
     });
-  } catch (err) {
-    alert('Failed to save update.');
-    return;
-  }
+  } catch (err) { alert(err.message || 'Failed to save update.'); return; }
   document.getElementById('d-saved').classList.add('is-on');
   setTimeout(() => document.getElementById('d-saved').classList.remove('is-on'), 2400);
-  await refresh();
+  await refreshCases();
   await renderDrawer();
 });
 
 document.getElementById('d-assign-me').addEventListener('click', async () => {
   if (!state.selectedId) return;
-  try { await assignToMe(state.selectedId); }
-  catch (err) { alert('Failed to assign.'); return; }
-  await refresh();
+  try { await api('POST', '/api/officer/applications/' + state.selectedId + '/assign-me'); }
+  catch (err) { alert(err.message || 'Failed to assign.'); return; }
+  await refreshCases();
   await renderDrawer();
 });
 
+/* =========================================================
+   Dashboard
+   ========================================================= */
+async function loadDashboard() {
+  const wrap = document.getElementById('dash-wrap');
+  wrap.innerHTML = '<div class="loading">Loading…</div>';
+  let data;
+  try { data = await api('GET', '/api/admin/dashboard'); }
+  catch (e) { wrap.innerHTML = `<div class="error-flash">${escapeHtml(e.message)}</div>`; return; }
+
+  const t = data.totals;
+  const ttc = data.time_to_completion.overall;
+  const stats = [
+    { label: 'Total submissions', value: t.total_applications },
+    { label: 'Open',               value: t.open_count, sub: 'Not yet completed or rejected' },
+    { label: 'Completed',          value: t.completed_count },
+    { label: 'Rejected',           value: t.rejected_count },
+    { label: 'Median days to completion', value: ttc.median_days != null ? ttc.median_days : '—', sub: ttc.count ? `Across ${ttc.count} completed application${ttc.count === 1 ? '' : 's'}` : 'No completed applications yet' },
+    { label: 'Mean days to completion',   value: ttc.mean_days   != null ? ttc.mean_days   : '—', sub: ttc.p90_days != null ? `p90: ${ttc.p90_days} days` : '' },
+    { label: 'Flagged after close', value: t.flagged_count, sub: 'Submissions to closed programmes' }
+  ];
+  const statHtml = stats.map(s => `
+    <div class="stat">
+      <div class="label">${escapeHtml(s.label)}</div>
+      <div class="value">${escapeHtml(String(s.value))}</div>
+      ${s.sub ? `<div class="sub">${escapeHtml(s.sub)}</div>` : ''}
+    </div>
+  `).join('');
+
+  const perProgRows = data.time_to_completion.per_programme.map(p => `
+    <tr>
+      <td><strong>${escapeHtml(p.programme_name)}</strong> <span class="dim" style="color:var(--slate-500);font-family:'JetBrains Mono',monospace;font-size:12px;margin-left:4px;">${escapeHtml(p.programme_code)}</span></td>
+      <td class="dim">${p.count}</td>
+      <td class="dim">${p.median_days != null ? p.median_days : '—'}</td>
+      <td class="dim">${p.mean_days   != null ? p.mean_days   : '—'}</td>
+      <td class="dim">${p.p90_days    != null ? p.p90_days    : '—'}</td>
+      <td class="dim">${p.min_days    != null ? p.min_days    : '—'}</td>
+      <td class="dim">${p.max_days    != null ? p.max_days    : '—'}</td>
+    </tr>
+  `).join('');
+
+  const officerRows = data.officer_caseload.map(o => `
+    <tr>
+      <td><strong>${escapeHtml(o.officer_name)}</strong></td>
+      <td class="dim">${o.open_count}</td>
+      <td class="dim">${o.total_count}</td>
+    </tr>
+  `).join('');
+
+  const byStatusRows = data.by_status.map(s => `
+    <tr>
+      <td><span class="pill" data-s="${s.status}"><span class="dot"></span>${STATUS_LABELS[s.status] || s.status}</span></td>
+      <td class="dim">${s.n}</td>
+    </tr>
+  `).join('');
+
+  wrap.innerHTML = `
+    <div class="stat-grid">${statHtml}</div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Time to completion by programme</h2>
+        <div class="stamp">Days from "received" event to first "completed" event.</div>
+      </div>
+      <div class="panel-body">
+        <table class="t">
+          <thead><tr><th>Programme</th><th>Completed (n)</th><th>Median</th><th>Mean</th><th>p90</th><th>Min</th><th>Max</th></tr></thead>
+          <tbody>${perProgRows || `<tr><td colspan="7" class="dim" style="text-align:center;padding:18px;">No completed applications yet.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Caseload by status</h2></div>
+      <div class="panel-body">
+        <table class="t"><thead><tr><th>Status</th><th>Count</th></tr></thead>
+          <tbody>${byStatusRows || `<tr><td colspan="2" class="dim" style="text-align:center;padding:18px;">No applications.</td></tr>`}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h2>Caseload by officer</h2></div>
+      <div class="panel-body">
+        <table class="t"><thead><tr><th>Officer</th><th>Open</th><th>Total ever</th></tr></thead>
+          <tbody>${officerRows}</tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="dim" style="text-align:right;font-size:12px;color:var(--slate-500);">Generated ${escapeHtml(formatDate(data.generated_at.replace('T',' ')))}</div>
+  `;
+}
+document.getElementById('dash-refresh').addEventListener('click', loadDashboard);
+
+/* =========================================================
+   Users (admin)
+   ========================================================= */
+async function loadUsers() {
+  const tbody = document.getElementById('users-tbody');
+  tbody.innerHTML = `<tr><td colspan="8" class="loading">Loading…</td></tr>`;
+  let data;
+  try { data = await api('GET', '/api/admin/officers'); }
+  catch (e) { tbody.innerHTML = `<tr><td colspan="8" class="error-flash">${escapeHtml(e.message)}</td></tr>`; return; }
+  state.officers = data.officers;
+  tbody.innerHTML = state.officers.map(o => `
+    <tr data-id="${o.id}">
+      <td><strong>${escapeHtml(o.name)}</strong><div class="dim" style="font-size:12px;color:var(--slate-500);">${escapeHtml(o.role)}</div></td>
+      <td class="code">${escapeHtml(o.username)}</td>
+      <td>${escapeHtml(o.email)}</td>
+      <td class="dim">${escapeHtml(o.ministry)}</td>
+      <td>${o.is_admin ? '<span class="pill pill-on">Admin</span>' : '<span class="dim">—</span>'}</td>
+      <td>${o.is_active ? '<span class="pill pill-on">Active</span>' : '<span class="pill pill-closed">Inactive</span>'}</td>
+      <td class="dim">${o.programme_count} of ${state.programmes.length || '—'}</td>
+      <td class="actions">
+        <button class="btn btn-sm" data-action="edit">Edit</button>
+        <button class="btn btn-sm" data-action="programmes">Programmes</button>
+        <button class="btn btn-sm" data-action="password">Password</button>
+      </td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('button[data-action]').forEach(b => {
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = parseInt(b.closest('tr').dataset.id, 10);
+      const action = b.dataset.action;
+      const o = state.officers.find(x => x.id === id);
+      if (action === 'edit') openEditUser(o);
+      if (action === 'programmes') openOfficerProgrammes(o);
+      if (action === 'password') openSetPassword(o);
+    });
+  });
+}
+
+document.getElementById('user-new').addEventListener('click', () => openEditUser(null));
+
+function openEditUser(officer) {
+  const isNew = !officer;
+  openModal({
+    title: isNew ? 'Add user' : `Edit ${officer.name}`,
+    body: `
+      <form id="user-form" novalidate>
+        <div class="field-row">
+          <div class="field">
+            <label>Username ${isNew ? '<span style="color:var(--red);">*</span>' : '<span style="color:var(--slate-500);font-weight:500;">(can\'t change)</span>'}</label>
+            <input type="text" name="username" value="${escapeHtml(officer ? officer.username : '')}" ${isNew ? '' : 'disabled'} required>
+          </div>
+          <div class="field">
+            <label>Name *</label>
+            <input type="text" name="name" value="${escapeHtml(officer ? officer.name : '')}" required>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Email *</label>
+            <input type="email" name="email" value="${escapeHtml(officer ? officer.email : '')}" required>
+          </div>
+          <div class="field">
+            <label>Ministry *</label>
+            <input type="text" name="ministry" value="${escapeHtml(officer ? officer.ministry : 'MYSCE')}" required>
+          </div>
+        </div>
+        <div class="field">
+          <label>Role *</label>
+          <input type="text" name="role" value="${escapeHtml(officer ? officer.role : '')}" placeholder="e.g. YDP Officer" required>
+        </div>
+        ${isNew ? `
+        <div class="field">
+          <label>Initial password * <span style="color:var(--slate-500);font-weight:500;">(min 8 chars)</span></label>
+          <input type="password" name="password" minlength="8" required>
+        </div>` : ''}
+        <div class="field-row">
+          <label class="check"><input type="checkbox" name="is_admin" ${officer && officer.is_admin ? 'checked' : ''}> Admin (can manage users, programmes, see audit log)</label>
+          ${isNew ? '' : `<label class="check"><input type="checkbox" name="is_active" ${officer.is_active ? 'checked' : ''} ${me && officer.id === me.id ? 'disabled' : ''}> Active (can sign in)</label>`}
+        </div>
+        <div id="user-error" class="error-flash" hidden></div>
+      </form>
+    `,
+    footer: `
+      <button class="btn" id="user-cancel">Cancel</button>
+      <button class="btn btn-primary" id="user-save">${isNew ? 'Add user' : 'Save changes'}</button>
+    `,
+    onMount: () => {
+      document.getElementById('user-cancel').addEventListener('click', closeModal);
+      document.getElementById('user-save').addEventListener('click', async () => {
+        const form = document.getElementById('user-form');
+        const fd = new FormData(form);
+        const body = Object.fromEntries(fd.entries());
+        body.is_admin = form.is_admin.checked;
+        if (!isNew) body.is_active = form.is_active.checked;
+        const errEl = document.getElementById('user-error');
+        errEl.hidden = true;
+        try {
+          if (isNew) await api('POST', '/api/admin/officers', body);
+          else {
+            // Don't send the disabled username field; backend ignores anyway.
+            const { username, ...payload } = body;
+            await api('PATCH', '/api/admin/officers/' + officer.id, payload);
+          }
+          closeModal();
+          await loadUsers();
+        } catch (e) {
+          errEl.textContent = e.message; errEl.hidden = false;
+        }
+      });
+    }
+  });
+}
+
+function openSetPassword(officer) {
+  openModal({
+    title: `Reset password for ${officer.name}`,
+    body: `
+      <div class="hint" style="color:var(--slate-600);font-size:13px;margin-bottom:12px;">
+        The new password takes effect immediately. The user is not emailed — share it with them through a secure channel.
+      </div>
+      <form id="pw-form" novalidate>
+        <div class="field">
+          <label>New password * <span style="color:var(--slate-500);font-weight:500;">(min 8 chars)</span></label>
+          <input type="password" name="password" minlength="8" required>
+        </div>
+        <div id="pw-error" class="error-flash" hidden></div>
+      </form>
+    `,
+    footer: `
+      <button class="btn" id="pw-cancel">Cancel</button>
+      <button class="btn btn-primary" id="pw-save">Set password</button>
+    `,
+    onMount: () => {
+      document.getElementById('pw-cancel').addEventListener('click', closeModal);
+      document.getElementById('pw-save').addEventListener('click', async () => {
+        const pw = document.getElementById('pw-form').password.value;
+        const errEl = document.getElementById('pw-error');
+        errEl.hidden = true;
+        try {
+          await api('POST', '/api/admin/officers/' + officer.id + '/password', { password: pw });
+          closeModal();
+          alert('Password updated. Share it with ' + officer.name + ' through a secure channel.');
+        } catch (e) { errEl.textContent = e.message; errEl.hidden = false; }
+      });
+    }
+  });
+}
+
+async function openOfficerProgrammes(officer) {
+  let data;
+  try { data = await api('GET', '/api/admin/officers/' + officer.id + '/programmes'); }
+  catch (e) { alert(e.message); return; }
+  openModal({
+    title: `Programmes for ${officer.name}`,
+    body: `
+      <div class="hint" style="color:var(--slate-600);font-size:13px;margin-bottom:12px;">
+        Tick the programmes ${officer.name} should be able to see and manage. They will only see applications in these programmes.
+        ${officer.is_admin ? '<br><strong>Note:</strong> Admins see every application regardless of these settings.' : ''}
+      </div>
+      <form id="op-form" style="display:flex;flex-direction:column;gap:8px;">
+        ${data.programmes.map(p => `
+          <label class="check">
+            <input type="checkbox" value="${p.id}" ${p.assigned ? 'checked' : ''}>
+            <span><strong>${escapeHtml(p.code)}</strong> — ${escapeHtml(p.name)}</span>
+          </label>
+        `).join('')}
+        <div id="op-error" class="error-flash" hidden></div>
+      </form>
+    `,
+    footer: `
+      <button class="btn" id="op-cancel">Cancel</button>
+      <button class="btn btn-primary" id="op-save">Save</button>
+    `,
+    onMount: () => {
+      document.getElementById('op-cancel').addEventListener('click', closeModal);
+      document.getElementById('op-save').addEventListener('click', async () => {
+        const ids = [...document.querySelectorAll('#op-form input:checked')].map(i => parseInt(i.value, 10));
+        const errEl = document.getElementById('op-error');
+        errEl.hidden = true;
+        try {
+          await api('PUT', '/api/admin/officers/' + officer.id + '/programmes', { programme_ids: ids });
+          closeModal();
+          await loadUsers();
+        } catch (e) { errEl.textContent = e.message; errEl.hidden = false; }
+      });
+    }
+  });
+}
+
+/* =========================================================
+   Programmes (admin)
+   ========================================================= */
+async function loadProgrammes() {
+  const tbody = document.getElementById('prog-tbody');
+  tbody.innerHTML = `<tr><td colspan="7" class="loading">Loading…</td></tr>`;
+  let data;
+  try { data = await api('GET', '/api/admin/programmes'); }
+  catch (e) { tbody.innerHTML = `<tr><td colspan="7" class="error-flash">${escapeHtml(e.message)}</td></tr>`; return; }
+  state.programmes = data.programmes;
+  tbody.innerHTML = state.programmes.map(p => `
+    <tr data-id="${p.id}">
+      <td class="code">${escapeHtml(p.code)}</td>
+      <td><strong>${escapeHtml(p.name)}</strong></td>
+      <td class="dim">${escapeHtml(p.ministry)}</td>
+      <td class="dim">${p.default_sla_days}</td>
+      <td class="dim">${p.open_count} / ${p.application_count}</td>
+      <td>${p.accepting_applications ? '<span class="pill pill-on">Accepting</span>' : '<span class="pill pill-closed">Closed</span>'}</td>
+      <td class="actions">
+        <button class="btn btn-sm" data-action="toggle">${p.accepting_applications ? 'Close intake' : 'Re-open'}</button>
+        <button class="btn btn-sm" data-action="edit">Edit</button>
+      </td>
+    </tr>
+  `).join('');
+  tbody.querySelectorAll('button[data-action]').forEach(b => {
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = parseInt(b.closest('tr').dataset.id, 10);
+      const action = b.dataset.action;
+      const p = state.programmes.find(x => x.id === id);
+      if (action === 'edit') openEditProgramme(p);
+      if (action === 'toggle') toggleProgrammeAccepting(p);
+    });
+  });
+}
+
+document.getElementById('prog-new').addEventListener('click', () => openEditProgramme(null));
+
+async function toggleProgrammeAccepting(p) {
+  const next = !p.accepting_applications;
+  const verb = next ? 're-open' : 'close intake for';
+  if (!confirm(`Are you sure you want to ${verb} ${p.code}?`)) return;
+  try {
+    await api('PATCH', '/api/admin/programmes/' + p.id, { accepting_applications: next });
+    await loadProgrammes();
+  } catch (e) { alert(e.message); }
+}
+
+function openEditProgramme(programme) {
+  const isNew = !programme;
+  openModal({
+    title: isNew ? 'Add programme' : `Edit ${programme.name}`,
+    body: `
+      <form id="prog-form" novalidate>
+        <div class="field-row">
+          <div class="field">
+            <label>Code ${isNew ? '<span style="color:var(--red);">*</span>' : '<span style="color:var(--slate-500);font-weight:500;">(can\'t change)</span>'}</label>
+            <input type="text" name="code" value="${escapeHtml(programme ? programme.code : '')}" ${isNew ? 'required pattern="[A-Z][A-Z0-9_-]{1,15}"' : 'disabled'}>
+          </div>
+          <div class="field">
+            <label>Default SLA (days) *</label>
+            <input type="number" name="default_sla_days" value="${programme ? programme.default_sla_days : 14}" min="1" max="365" required>
+          </div>
+        </div>
+        <div class="field">
+          <label>Name *</label>
+          <input type="text" name="name" value="${escapeHtml(programme ? programme.name : '')}" required>
+        </div>
+        <div class="field">
+          <label>Ministry *</label>
+          <input type="text" name="ministry" value="${escapeHtml(programme ? programme.ministry : 'Ministry of Youth, Sport and Community Engagement')}" required>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Contact email</label>
+            <input type="email" name="contact_email" value="${escapeHtml(programme ? (programme.contact_email || '') : '')}">
+          </div>
+          <div class="field">
+            <label>Contact phone</label>
+            <input type="text" name="contact_phone" value="${escapeHtml(programme ? (programme.contact_phone || '') : '')}">
+          </div>
+        </div>
+        <label class="check">
+          <input type="checkbox" name="accepting_applications" ${(programme ? programme.accepting_applications : true) ? 'checked' : ''}>
+          Currently accepting applications
+        </label>
+        <div id="prog-error" class="error-flash" hidden></div>
+      </form>
+    `,
+    footer: `
+      <button class="btn" id="prog-cancel">Cancel</button>
+      <button class="btn btn-primary" id="prog-save">${isNew ? 'Add programme' : 'Save changes'}</button>
+    `,
+    onMount: () => {
+      document.getElementById('prog-cancel').addEventListener('click', closeModal);
+      document.getElementById('prog-save').addEventListener('click', async () => {
+        const form = document.getElementById('prog-form');
+        const fd = new FormData(form);
+        const body = Object.fromEntries(fd.entries());
+        body.accepting_applications = form.accepting_applications.checked;
+        body.default_sla_days = parseInt(body.default_sla_days, 10) || 14;
+        const errEl = document.getElementById('prog-error');
+        errEl.hidden = true;
+        try {
+          if (isNew) await api('POST', '/api/admin/programmes', body);
+          else {
+            const { code, ...payload } = body;
+            await api('PATCH', '/api/admin/programmes/' + programme.id, payload);
+          }
+          closeModal();
+          await loadProgrammes();
+        } catch (e) { errEl.textContent = e.message; errEl.hidden = false; }
+      });
+    }
+  });
+}
+
+/* =========================================================
+   Audit log (admin)
+   ========================================================= */
+const AUDIT_ACTIONS = [
+  'login.success', 'login.fail', 'logout',
+  'application.intake', 'application.status_change', 'application.assign',
+  'officer.create', 'officer.update', 'officer.deactivate', 'officer.password_reset', 'officer.programmes_update',
+  'programme.create', 'programme.update', 'programme.toggle_accepting',
+  'test_email.send'
+];
+
+function initAuditFilter() {
+  const sel = document.getElementById('audit-action');
+  if (sel.children.length > 1) return;
+  for (const a of AUDIT_ACTIONS) {
+    const o = document.createElement('option');
+    o.value = a; o.textContent = a;
+    sel.appendChild(o);
+  }
+}
+
+async function loadAuditLog(reset) {
+  initAuditFilter();
+  const list = document.getElementById('audit-list');
+  if (reset) {
+    state.audit.entries = [];
+    list.innerHTML = '<div class="loading">Loading…</div>';
+  }
+  const lastId = !reset && state.audit.entries.length ? state.audit.entries[state.audit.entries.length - 1].id : null;
+  const params = new URLSearchParams();
+  params.set('limit', '50');
+  if (lastId) params.set('before', String(lastId));
+  if (state.audit.action) params.set('action', state.audit.action);
+  let data;
+  try { data = await api('GET', '/api/admin/audit-log?' + params.toString()); }
+  catch (e) { list.innerHTML = `<div class="error-flash">${escapeHtml(e.message)}</div>`; return; }
+
+  state.audit.entries = state.audit.entries.concat(data.entries);
+  state.audit.hasMore = data.entries.length >= 50;
+  document.getElementById('audit-more').hidden = !state.audit.hasMore;
+
+  if (state.audit.entries.length === 0) {
+    list.innerHTML = '<div class="empty">No audit log entries match.</div>';
+    return;
+  }
+  list.innerHTML = state.audit.entries.map(e => {
+    const target = e.target_kind ? `${e.target_kind}#${e.target_id}` : '';
+    const diffPieces = [];
+    if (e.before && e.after) {
+      for (const k of Object.keys(e.after)) {
+        if (JSON.stringify(e.before[k]) !== JSON.stringify(e.after[k])) {
+          diffPieces.push(`${k}: ${stringify(e.before[k])} → ${stringify(e.after[k])}`);
+        }
+      }
+    } else if (e.after && !e.before) {
+      diffPieces.push('created: ' + stringify(e.after));
+    }
+    const diff = diffPieces.length ? `<div class="diff">${escapeHtml(diffPieces.join('\n'))}</div>` : '';
+    const meta = e.metadata && Object.keys(e.metadata).length
+      ? Object.entries(e.metadata).filter(([k]) => k !== 'user_agent').map(([k, v]) => `${k}=${stringify(v)}`).join(' · ')
+      : '';
+    return `
+      <div class="audit-row">
+        <div class="when">${escapeHtml(formatDate(e.created_at))}<div style="color:var(--slate-400);font-size:11px;">#${e.id}</div></div>
+        <div class="what">
+          <div><span class="action">${escapeHtml(e.action)}</span> ${target ? `<span class="dim" style="color:var(--slate-500);">on ${escapeHtml(target)}</span>` : ''}</div>
+          <div class="who">${escapeHtml(e.actor_label || '— system —')}</div>
+          ${meta ? `<div style="color:var(--slate-500);font-size:11.5px;margin-top:3px;">${escapeHtml(meta)}</div>` : ''}
+          ${diff}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+function stringify(v) {
+  if (v == null) return '—';
+  if (typeof v === 'string') return v;
+  try { return JSON.stringify(v); } catch (_) { return String(v); }
+}
+document.getElementById('audit-action').addEventListener('change', e => {
+  state.audit.action = e.target.value;
+  loadAuditLog(true);
+});
+document.getElementById('audit-refresh').addEventListener('click', () => loadAuditLog(true));
+document.getElementById('audit-more').addEventListener('click', () => loadAuditLog(false));
+
+/* =========================================================
+   Modal helper
+   ========================================================= */
+const modalBackdrop = document.getElementById('modal-backdrop');
+function openModal({ title, body, footer, onMount }) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = body;
+  document.getElementById('modal-foot').innerHTML = footer || '';
+  modalBackdrop.classList.add('is-open');
+  if (onMount) onMount();
+}
+function closeModal() { modalBackdrop.classList.remove('is-open'); }
+document.getElementById('modal-close').addEventListener('click', closeModal);
+modalBackdrop.addEventListener('click', e => { if (e.target === modalBackdrop) closeModal(); });
+
+/* =========================================================
+   Utilities
+   ========================================================= */
 function formatDate(s) {
   if (!s) return '';
   const cleaned = String(s).replace('T',' ').replace('Z','').split('.')[0];
@@ -643,10 +1328,6 @@ function escapeHtml(s) {
 
 /* =========================================================
    Form-data renderer — generic, recursive, no per-programme schema.
-   The MVP intentionally accepts arbitrary JSON from upstream and renders
-   it as a key/value tree. Keys are humanised (snake_case and camelCase),
-   values respect type (booleans → Yes/No, arrays → lists, nested objects
-   → indented sub-trees, multi-line strings preserve breaks).
    ========================================================= */
 function renderFormData(data) {
   if (data == null) return '<div class="empty">— no submission data —</div>';
@@ -669,17 +1350,14 @@ function renderValue(v) {
   if (typeof v === 'boolean') return v ? 'Yes' : 'No';
   if (typeof v === 'number') return escapeHtml(String(v));
   if (typeof v === 'string') {
-    // Preserve newlines and detect URLs.
     const escaped = escapeHtml(v).replace(/\n/g, '<br>');
     if (/^https?:\/\//.test(v)) return `<a href="${encodeURI(v)}" target="_blank" rel="noopener">${escaped}</a>`;
     return escaped;
   }
   if (Array.isArray(v)) {
-    // Array of primitives → comma-separated (compact).
     if (v.every(x => typeof x !== 'object' || x === null)) {
       return v.map(x => x == null ? '—' : escapeHtml(String(x))).join(', ');
     }
-    // Array of objects → numbered, each rendered recursively.
     return '<div class="nested">' + v.map((x, i) => `
       <div style="margin-bottom:6px;">
         <div style="color:var(--slate-500);font-size:12px;">#${i + 1}</div>

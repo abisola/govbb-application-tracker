@@ -83,9 +83,9 @@ const PROGRAMMES = [
 ];
 
 const OFFICERS = [
-  { username: 'andrea', password: 'andrea',  name: 'Andrea Best',     email: 'andrea.best@barbados.gov.bb',     ministry: 'MYSCE', role: 'Senior YDP Officer' },
-  { username: 'trevor', password: 'trevor',  name: 'Trevor Inniss',   email: 'trevor.inniss@barbados.gov.bb',   ministry: 'MYSCE', role: 'YDP Officer' },
-  { username: 'joy',    password: 'joy',     name: 'Joy Greenidge',   email: 'joy.greenidge@barbados.gov.bb',   ministry: 'MYSCE', role: 'YDP Programme Manager' }
+  { username: 'andrea', password: 'andrea',  name: 'Andrea Best',     email: 'andrea.best@barbados.gov.bb',     ministry: 'MYSCE', role: 'Senior YDP Officer',       is_admin: 1 },
+  { username: 'trevor', password: 'trevor',  name: 'Trevor Inniss',   email: 'trevor.inniss@barbados.gov.bb',   ministry: 'MYSCE', role: 'YDP Officer',              is_admin: 0 },
+  { username: 'joy',    password: 'joy',     name: 'Joy Greenidge',   email: 'joy.greenidge@barbados.gov.bb',   ministry: 'MYSCE', role: 'YDP Programme Manager',    is_admin: 0 }
 ];
 
 const APPLICANTS = [
@@ -257,16 +257,25 @@ for (const p of PROGRAMMES) {
 }
 console.log(`  ✓ ${PROGRAMMES.length} programmes`);
 
-// Officers
-const upsertOfficer = db.prepare(`
-  INSERT INTO officers (username, password_hash, name, email, ministry, role)
-  VALUES (@username, @password_hash, @name, @email, @ministry, @role)
+// Officers — upserts password (when supplied), name/email/ministry/role,
+// AND is_admin/is_active so the role assignment in the seed always wins.
+const upsertOfficerWithPassword = db.prepare(`
+  INSERT INTO officers (username, password_hash, name, email, ministry, role, is_admin, is_active)
+  VALUES (@username, @password_hash, @name, @email, @ministry, @role, @is_admin, 1)
   ON CONFLICT(username) DO UPDATE SET
     password_hash = excluded.password_hash,
     name = excluded.name,
     email = excluded.email,
     ministry = excluded.ministry,
-    role = excluded.role
+    role = excluded.role,
+    is_admin = excluded.is_admin,
+    is_active = 1
+`);
+const updateOfficerNoPassword = db.prepare(`
+  UPDATE officers
+     SET name = @name, email = @email, ministry = @ministry, role = @role,
+         is_admin = @is_admin, is_active = 1
+   WHERE username = @username
 `);
 
 const officerIds = {};
@@ -278,11 +287,10 @@ for (const o of OFFICERS) {
     plaintext = process.env[envKey];
     if (!plaintext) {
       // Only generate if the row doesn't exist yet. If the officer is already
-      // seeded, leave their existing password alone.
+      // seeded, leave their existing password alone — but still refresh
+      // is_admin / role / name in case the seed has changed.
       const existing = db.prepare('SELECT 1 FROM officers WHERE username = ?').get(o.username);
       if (existing) {
-        // Skip the upsert's password update by re-using a placeholder hash;
-        // we'll restore the existing one below.
         plaintext = null;
       } else {
         plaintext = 'pw_' + crypto.randomBytes(9).toString('base64url');
@@ -291,19 +299,49 @@ for (const o of OFFICERS) {
     }
   }
   if (plaintext) {
-    upsertOfficer.run({
+    upsertOfficerWithPassword.run({
       username: o.username,
       password_hash: bcrypt.hashSync(plaintext, 10),
       name: o.name,
       email: o.email,
       ministry: o.ministry,
-      role: o.role
+      role: o.role,
+      is_admin: o.is_admin || 0
+    });
+  } else {
+    // Existing officer + no password override: refresh metadata only.
+    updateOfficerNoPassword.run({
+      username: o.username,
+      name: o.name,
+      email: o.email,
+      ministry: o.ministry,
+      role: o.role,
+      is_admin: o.is_admin || 0
     });
   }
   const row = db.prepare('SELECT id FROM officers WHERE username = ?').get(o.username);
   if (row) officerIds[o.username] = row.id;
 }
-console.log(`  ✓ ${OFFICERS.length} officers`);
+console.log(`  ✓ ${OFFICERS.length} officers (Andrea is admin)`);
+
+// Programme assignments: every active officer gets every active programme by
+// default. Idempotent — INSERT OR IGNORE skips rows that already exist.
+const assign = db.prepare(`
+  INSERT OR IGNORE INTO officer_programmes (officer_id, programme_id, granted_by_officer_id)
+  VALUES (?, ?, NULL)
+`);
+const allProgrammeIds = db.prepare('SELECT id FROM programmes').all().map(r => r.id);
+const allOfficerIds = db.prepare('SELECT id FROM officers WHERE is_active = 1').all().map(r => r.id);
+let assignmentCount = 0;
+for (const oid of allOfficerIds) {
+  for (const pid of allProgrammeIds) {
+    const r = assign.run(oid, pid);
+    assignmentCount += r.changes;
+  }
+}
+if (assignmentCount > 0) {
+  console.log(`  ✓ ${assignmentCount} new programme assignments (officer × programme)`);
+}
 
 // Applications
 const insertApplicant = db.prepare(`
