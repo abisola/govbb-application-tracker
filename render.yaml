@@ -1,0 +1,49 @@
+# Render service definition.
+#
+# To deploy:
+#   1. Push this repo to GitHub.
+#   2. In Render, "New +" → "Blueprint" → point at this repo.
+#   3. Render reads this file and creates the service + disk.
+#   4. Set the env vars marked sync: false (secrets) in the Render UI.
+#   5. The service builds, runs `node seed.js` once at boot (idempotent in
+#      production), then starts. Watch the deploy log for any generated
+#      passwords / API key — copy them to your password manager.
+services:
+  - type: web
+    name: govbb-tracker
+    runtime: docker
+    plan: starter            # ~$7/mo: always-on, persistent disk supported
+    region: oregon           # closest Render region; for Caribbean users a
+                             # custom domain via Cloudflare is the easiest
+                             # latency win (cf nodes are everywhere).
+    branch: main
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3030
+      - key: TRACKER_DATA_DIR
+        value: /var/data
+      - key: MAIL_OUT_DIR
+        value: /var/data/mail-out
+      - key: SESSION_SECRET
+        generateValue: true   # Render generates once and stores
+      - key: TRACKER_BASE_URL
+        sync: false           # set in Render UI to your public URL
+      - key: RESEND_API_KEY
+        sync: false
+      - key: FROM_EMAIL
+        sync: false
+      - key: INCOMING_API_KEY
+        sync: false           # leave blank on first deploy to auto-generate
+      - key: OFFICER_PASSWORD_ANDREA
+        sync: false
+      - key: OFFICER_PASSWORD_TREVOR
+        sync: false
+      - key: OFFICER_PASSWORD_JOY
+        sync: false
+    disk:
+      name: tracker-data
+      mountPath: /var/data
+      sizeGB: 1               # smallest tier; the DB + email audit easily fit

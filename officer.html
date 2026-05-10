@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Caseload — GovBB officer console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --slate-950: #0f172a; --slate-900: #1e293b; --slate-800: #334155;
+    --slate-700: #475569; --slate-500: #64748b; --slate-400: #94a3b8;
+    --slate-300: #cbd5e1; --slate-200: #e2e8f0; --slate-100: #f1f5f9; --slate-50: #f8fafc;
+    --accent: #00267f; --accent-soft: #e5e9f2;
+    --green: #047857; --green-soft: #d1fae5;
+    --amber: #b45309; --amber-soft: #fef3c7;
+    --red: #b91c1c; --red-soft: #fee2e2;
+    --teal: #0e7490; --teal-soft: #cffafe;
+    --grey-soft: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: Inter, -apple-system, system-ui, sans-serif;
+    font-size: 14px; color: var(--slate-900); background: var(--slate-50);
+    -webkit-font-smoothing: antialiased;
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    grid-template-rows: 56px 1fr;
+    grid-template-areas: "topbar topbar" "sidenav main";
+    height: 100vh; overflow: hidden;
+  }
+  .topbar { grid-area: topbar; background: var(--slate-950); color: #fff; display: flex; align-items: center; padding: 0 20px; gap: 16px; border-bottom: 1px solid var(--slate-800); }
+  .brand { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+  .brand-mark { width: 28px; height: 28px; background: #ffc726; color: #000; border-radius: 6px; display: grid; place-items: center; font-weight: 800; font-size: 13px; letter-spacing: -0.04em; }
+  .topbar .env-pill { background: var(--slate-800); color: var(--slate-300); padding: 3px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+  .topbar .spacer { flex: 1; }
+  .topbar .me { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .me-avatar { width: 28px; height: 28px; background: #00267f; color: #fff; border-radius: 999px; display: grid; place-items: center; font-weight: 600; font-size: 12px; }
+  .topbar a { color: var(--slate-300); text-decoration: none; font-size: 13px; }
+  .topbar a:hover { color: #fff; }
+  .topbar button.linklike { background: none; border: 0; color: var(--slate-300); cursor: pointer; font: inherit; font-size: 13px; padding: 0; }
+  .topbar button.linklike:hover { color: #fff; }
+
+  .sidenav { grid-area: sidenav; background: var(--slate-900); color: var(--slate-300); padding: 16px 0; overflow-y: auto; }
+  .sidenav h3 { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--slate-500); margin: 18px 20px 8px; }
+  .sidenav a { display: flex; align-items: center; justify-content: space-between; padding: 8px 20px; color: var(--slate-300); text-decoration: none; font-size: 14px; border-left: 3px solid transparent; cursor: pointer; }
+  .sidenav a:hover { background: var(--slate-800); color: #fff; }
+  .sidenav a.is-active { background: var(--slate-800); color: #fff; border-left-color: #ffc726; font-weight: 600; }
+  .sidenav .count { background: var(--slate-700); color: var(--slate-200); font-size: 11px; padding: 2px 7px; border-radius: 999px; font-weight: 600; }
+  .sidenav a.is-active .count { background: #ffc726; color: #000; }
+
+  main { grid-area: main; overflow: hidden; display: flex; flex-direction: column; background: var(--slate-50); }
+  .page-head { padding: 16px 24px; border-bottom: 1px solid var(--slate-200); background: #fff; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .page-head h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+  .page-head .sub { color: var(--slate-500); font-size: 13px; margin-top: 2px; }
+  .btn { border: 1px solid var(--slate-300); background: #fff; color: var(--slate-800); padding: 7px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .btn:hover { background: var(--slate-100); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #001b5c; }
+  .btn:focus-visible { outline: 3px solid #ffc726; outline-offset: 1px; }
+
+  .filters { padding: 12px 24px; background: #fff; border-bottom: 1px solid var(--slate-200); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .search-box { position: relative; flex: 1 1 280px; min-width: 240px; max-width: 420px; }
+  .search-box input { width: 100%; border: 1px solid var(--slate-300); background: var(--slate-50); padding: 8px 12px 8px 34px; border-radius: 6px; font-size: 13px; font-family: inherit; }
+  .search-box svg { position: absolute; left: 10px; top: 9px; color: var(--slate-500); }
+  .search-box input:focus { outline: 2px solid var(--accent); border-color: var(--accent); background: #fff; }
+  .filter-select { border: 1px solid var(--slate-300); background: #fff; padding: 7px 28px 7px 10px; border-radius: 6px; font-size: 13px; font-family: inherit; appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6' fill='none'><path d='M1 1l4 4 4-4' stroke='%2364748b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+    background-repeat: no-repeat; background-position: right 10px center; cursor: pointer; }
+  .filter-select:focus { outline: 2px solid var(--accent); }
+  .filter-clear { color: var(--slate-700); font-size: 13px; background: none; border: none; cursor: pointer; padding: 6px 8px; text-decoration: underline; }
+  .filter-clear:hover { color: var(--slate-900); }
+
+  .table-wrap { flex: 1; overflow: auto; padding: 0 24px 24px; }
+  table.caseload { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--slate-200); border-radius: 8px; overflow: hidden; margin-top: 16px; font-size: 13.5px; }
+  table.caseload thead th { text-align: left; background: var(--slate-100); border-bottom: 1px solid var(--slate-200); color: var(--slate-700); font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; padding: 10px 14px; cursor: pointer; user-select: none; white-space: nowrap; }
+  table.caseload thead th:hover { background: var(--slate-200); }
+  table.caseload thead th .arrow { color: var(--slate-400); margin-left: 4px; }
+  table.caseload thead th.is-sorted .arrow { color: var(--slate-900); }
+  table.caseload tbody tr { border-bottom: 1px solid var(--slate-100); cursor: pointer; }
+  table.caseload tbody tr:hover { background: var(--slate-50); }
+  table.caseload tbody tr.is-selected { background: var(--accent-soft); }
+  table.caseload td { padding: 12px 14px; vertical-align: middle; color: var(--slate-800); }
+  td.code { font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace; font-weight: 500; color: var(--slate-900); font-size: 12.5px; white-space: nowrap; }
+  td.applicant { font-weight: 600; }
+  td.dim { color: var(--slate-500); }
+  td.age { font-variant-numeric: tabular-nums; white-space: nowrap; }
+  td.age.is-old { color: var(--red); font-weight: 600; }
+
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid transparent; white-space: nowrap; }
+  .pill .dot { width: 7px; height: 7px; border-radius: 999px; }
+  .pill[data-s="received"]      { background: var(--teal-soft);   color: var(--teal);   border-color: #a5f3fc; }
+  .pill[data-s="received"] .dot { background: var(--teal); }
+  .pill[data-s="under_review"]  { background: var(--accent-soft); color: var(--accent); border-color: #c7d2fe; }
+  .pill[data-s="under_review"] .dot { background: var(--accent); }
+  .pill[data-s="action_needed"] { background: var(--amber-soft);  color: var(--amber);  border-color: #fde68a; }
+  .pill[data-s="action_needed"] .dot { background: var(--amber); }
+  .pill[data-s="approved"]      { background: var(--green-soft);  color: var(--green);  border-color: #a7f3d0; }
+  .pill[data-s="approved"] .dot { background: var(--green); }
+  .pill[data-s="rejected"]      { background: var(--red-soft);    color: var(--red);    border-color: #fecaca; }
+  .pill[data-s="rejected"] .dot { background: var(--red); }
+  .pill[data-s="completed"]     { background: var(--grey-soft);   color: var(--slate-700); border-color: var(--slate-300); }
+  .pill[data-s="completed"] .dot { background: var(--slate-500); }
+
+  .drawer { position: fixed; top: 56px; right: 0; bottom: 0; width: min(640px, 100vw); background: #fff; border-left: 1px solid var(--slate-200); box-shadow: -10px 0 30px rgba(15, 23, 42, 0.08); transform: translateX(100%); transition: transform .25s ease; overflow-y: auto; z-index: 30; }
+  .drawer.is-open { transform: translateX(0); }
+  .drawer-backdrop { position: fixed; inset: 56px 0 0 0; background: rgba(15, 23, 42, .25); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 20; }
+  .drawer-backdrop.is-open { opacity: 1; pointer-events: auto; }
+  .drawer-head { padding: 16px 24px; border-bottom: 1px solid var(--slate-200); display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; position: sticky; top: 0; background: #fff; z-index: 1; }
+  .drawer-head h2 { margin: 0; font-size: 18px; font-weight: 700; }
+  .drawer-head .meta { color: var(--slate-500); font-size: 13px; margin-top: 4px; }
+  .drawer-close { background: none; border: 1px solid var(--slate-300); color: var(--slate-700); width: 32px; height: 32px; border-radius: 6px; cursor: pointer; display: grid; place-items: center; }
+  .drawer-close:hover { background: var(--slate-100); }
+  .drawer-body { padding: 0 24px 32px; }
+  .drawer-section { padding: 20px 0; border-bottom: 1px solid var(--slate-100); }
+  .drawer-section:last-child { border-bottom: none; }
+  .drawer-section h3 { margin: 0 0 12px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--slate-500); font-weight: 600; }
+  .kv { display: grid; grid-template-columns: 130px 1fr; row-gap: 8px; column-gap: 12px; font-size: 13.5px; }
+  .kv dt { color: var(--slate-500); }
+  .kv dd { margin: 0; color: var(--slate-900); font-weight: 500; }
+
+  /* Form data renderer — generic key/value tree; styled to look like a
+     compact spec sheet so officers can scan it quickly. */
+  .form-data { margin: 0; font-size: 13.5px; }
+  .form-data dl { display: grid; grid-template-columns: 180px 1fr; row-gap: 6px; column-gap: 12px; margin: 0; }
+  .form-data dt { color: var(--slate-500); font-weight: 500; padding-top: 1px; }
+  .form-data dd { margin: 0; color: var(--slate-900); font-weight: 500; word-break: break-word; }
+  .form-data dd .nested { margin-top: 4px; padding-left: 12px; border-left: 2px solid var(--slate-200); }
+  .form-data dd ul, .form-data dd ol { margin: 0; padding-left: 18px; }
+  .form-data .empty { color: var(--slate-400); font-style: italic; }
+  .form-data pre { margin: 0; font-family: inherit; white-space: pre-wrap; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 13px; font-weight: 600; color: var(--slate-800); margin-bottom: 4px; }
+  .field .hint { color: var(--slate-500); font-size: 12.5px; margin-bottom: 6px; }
+  .field input[type=text], .field textarea, .field select { width: 100%; border: 1px solid var(--slate-300); border-radius: 6px; padding: 8px 10px; font-size: 13.5px; font-family: inherit; background: #fff; }
+  .field textarea { min-height: 80px; resize: vertical; }
+  .field input:focus, .field textarea:focus, .field select:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+  .form-actions { display: flex; gap: 8px; align-items: center; }
+  .saved-flash { background: var(--green-soft); color: var(--green); border: 1px solid #a7f3d0; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 12px; display: none; }
+  .saved-flash.is-on { display: block; }
+
+  .activity { margin: 0; padding: 0; list-style: none; }
+  .activity li { position: relative; padding-left: 22px; padding-bottom: 14px; }
+  .activity li::before { content: ''; position: absolute; left: 6px; top: 6px; bottom: -2px; width: 2px; background: var(--slate-200); }
+  .activity li:last-child::before { display: none; }
+  .activity li::after { content: ''; position: absolute; left: 0; top: 4px; width: 14px; height: 14px; border-radius: 999px; background: #fff; border: 3px solid var(--slate-300); }
+  .activity li.s-received::after { border-color: var(--teal); }
+  .activity li.s-under_review::after { border-color: var(--accent); }
+  .activity li.s-action_needed::after { border-color: var(--amber); }
+  .activity li.s-approved::after { border-color: var(--green); }
+  .activity li.s-rejected::after { border-color: var(--red); }
+  .activity li.s-completed::after { border-color: var(--slate-500); }
+  .activity .stamp { font-size: 12px; color: var(--slate-500); font-variant-numeric: tabular-nums; }
+  .activity .body { font-size: 13.5px; margin-top: 2px; }
+  .activity .by { color: var(--slate-500); font-size: 12.5px; margin-top: 2px; }
+
+  .results-bar { padding: 10px 24px; font-size: 13px; color: var(--slate-700); display: flex; gap: 12px; align-items: center; }
+  .results-bar strong { color: var(--slate-900); }
+
+  .empty { padding: 32px; text-align: center; color: var(--slate-500); background: #fff; border: 1px dashed var(--slate-300); border-radius: 8px; margin: 16px 0; }
+  .loading { padding: 32px; text-align: center; color: var(--slate-500); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="brand-mark">BB</span><span>GovBB Caseload</span></div>
+  <span class="env-pill">Demo</span>
+  <span class="spacer"></span>
+  <a href="/" target="_blank" rel="noopener">Citizen view ↗</a>
+  <button class="linklike" id="signout">Sign out</button>
+  <div class="me">
+    <span class="me-avatar" id="me-initial">…</span>
+    <div>
+      <div style="font-weight:600;color:#fff;" id="me-name">Loading…</div>
+      <div style="color:var(--slate-400);font-size:11.5px;" id="me-role">—</div>
+    </div>
+  </div>
+</header>
+
+<aside class="sidenav">
+  <h3>Caseload</h3>
+  <a class="is-active" data-filter-status="all">All applications <span class="count" id="c-all">0</span></a>
+  <a data-filter-status="received">Received <span class="count" id="c-received">0</span></a>
+  <a data-filter-status="under_review">Under review <span class="count" id="c-under_review">0</span></a>
+  <a data-filter-status="action_needed">Action needed <span class="count" id="c-action_needed">0</span></a>
+  <a data-filter-status="approved">Approved <span class="count" id="c-approved">0</span></a>
+  <a data-filter-status="rejected">Rejected <span class="count" id="c-rejected">0</span></a>
+  <a data-filter-status="completed">Completed <span class="count" id="c-completed">0</span></a>
+
+  <h3>Mine</h3>
+  <a data-filter-mine="1">Assigned to me <span class="count" id="c-mine">0</span></a>
+</aside>
+
+<main>
+  <div class="page-head">
+    <div>
+      <h1 id="page-title">All applications</h1>
+      <div class="sub" id="page-sub">Showing every application across all programmes.</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <a class="btn" href="/submit-test" target="_blank">Submit a test application ↗</a>
+    </div>
+  </div>
+
+  <div class="filters">
+    <div class="search-box">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+      <input id="q" type="search" placeholder="Search code, applicant or programme…" autocomplete="off">
+    </div>
+    <select id="f-programme" class="filter-select" aria-label="Filter by programme">
+      <option value="">All programmes</option>
+    </select>
+    <select id="f-officer" class="filter-select" aria-label="Filter by assigned officer">
+      <option value="">All officers</option>
+    </select>
+    <select id="f-age" class="filter-select" aria-label="Filter by age">
+      <option value="">Any age</option>
+      <option value="3">Older than 3 days</option>
+      <option value="7">Older than 7 days</option>
+      <option value="14">Older than 14 days</option>
+    </select>
+    <button type="button" class="filter-clear" id="clear-filters">Clear filters</button>
+  </div>
+
+  <div class="results-bar">
+    <span><strong id="r-shown">0</strong> of <strong id="r-total">0</strong> applications</span>
+  </div>
+
+  <div class="table-wrap">
+    <table class="caseload" aria-label="Applications">
+      <thead>
+        <tr>
+          <th data-sort="code">Code <span class="arrow">↕</span></th>
+          <th data-sort="programme_name">Programme <span class="arrow">↕</span></th>
+          <th data-sort="applicant_name">Applicant <span class="arrow">↕</span></th>
+          <th data-sort="current_status">Status <span class="arrow">↕</span></th>
+          <th data-sort="assigned_officer_name">Assigned to <span class="arrow">↕</span></th>
+          <th data-sort="current_status_at">Updated <span class="arrow">↕</span></th>
+          <th data-sort="age">Age <span class="arrow">↕</span></th>
+        </tr>
+      </thead>
+      <tbody id="tbody"><tr><td colspan="7" class="loading">Loading caseload…</td></tr></tbody>
+    </table>
+    <div class="empty" id="empty" hidden>No applications match these filters.</div>
+  </div>
+</main>
+
+<div class="drawer-backdrop" id="backdrop"></div>
+<aside class="drawer" id="drawer" aria-hidden="true" aria-labelledby="d-title">
+  <div class="drawer-head">
+    <div>
+      <h2 id="d-title">—</h2>
+      <div class="meta">Reference <span id="d-code" style="font-family:'JetBrains Mono',monospace;color:var(--slate-900);font-weight:500;"></span></div>
+    </div>
+    <button class="drawer-close" id="drawer-close" aria-label="Close">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body">
+
+    <div class="drawer-section">
+      <h3>Summary</h3>
+      <dl class="kv">
+        <dt>Programme</dt>         <dd id="d-programme"></dd>
+        <dt>Applicant</dt>         <dd id="d-applicant"></dd>
+        <dt>Email</dt>             <dd id="d-email"></dd>
+        <dt>Phone</dt>             <dd id="d-phone"></dd>
+        <dt>Submitted</dt>         <dd id="d-submitted"></dd>
+        <dt>Current status</dt>    <dd><span class="pill" id="d-pill"></span></dd>
+        <dt>Assigned to</dt>       <dd id="d-assigned"></dd>
+      </dl>
+    </div>
+
+    <div class="drawer-section">
+      <h3>Submission</h3>
+      <div class="form-data" id="d-formdata"></div>
+    </div>
+
+    <div class="drawer-section">
+      <h3>Update status</h3>
+      <div class="saved-flash" id="d-saved">Saved. The citizen has been emailed and the tracker is updated.</div>
+      <form id="d-form" novalidate>
+        <div class="field">
+          <label for="d-newstatus">New status</label>
+          <select id="d-newstatus" required>
+            <option value="received">Received</option>
+            <option value="under_review">Under review</option>
+            <option value="action_needed">Action needed</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Not approved</option>
+            <option value="completed">Completed</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="d-internal">Internal note <span style="color:var(--slate-500);font-weight:500;">(officers only)</span></label>
+          <textarea id="d-internal" placeholder="Why did the status change? Anything the next officer should know."></textarea>
+        </div>
+        <div class="field">
+          <label for="d-message">Message to citizen <span style="color:var(--slate-500);font-weight:500;">(shown on the tracker, sent in the email)</span></label>
+          <div class="hint">Keep it short. Plain English. Tell them what to do, not what we’re doing.</div>
+          <textarea id="d-message" placeholder="e.g. We need an updated CV. Please upload it via the link in your email."></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Save update</button>
+          <button type="button" class="btn" id="d-assign-me">Assign to me</button>
+          <span style="flex:1"></span>
+          <a href="#" id="d-citizen-link" target="_blank" rel="noopener" style="font-size:13px;">Open citizen view ↗</a>
+        </div>
+      </form>
+    </div>
+
+    <div class="drawer-section">
+      <h3>Activity</h3>
+      <ul class="activity" id="d-activity"></ul>
+    </div>
+
+  </div>
+</aside>
+
+<script>
+const STATUS_LABELS = {
+  received: 'Received', under_review: 'Under review', action_needed: 'Action needed',
+  approved: 'Approved', rejected: 'Not approved', completed: 'Completed'
+};
+
+let me = null;
+const state = {
+  filterStatus: 'all', filterMine: false,
+  filterProgramme: '', filterOfficer: '', filterAge: '',
+  search: '', sortBy: 'current_status_at', sortDir: 'desc',
+  selectedId: null,
+  applications: []
+};
+
+/* =========================================================
+   API
+   ========================================================= */
+async function fetchMe() {
+  const r = await fetch('/api/me');
+  if (r.status === 401) { location.href = '/officer/login'; return null; }
+  const data = await r.json();
+  return data.officer;
+}
+async function fetchApplications() {
+  const r = await fetch('/api/officer/applications');
+  if (r.status === 401) { location.href = '/officer/login'; return []; }
+  const data = await r.json();
+  return data.applications;
+}
+async function fetchApplication(id) {
+  const r = await fetch('/api/officer/applications/' + id);
+  if (!r.ok) return null;
+  const data = await r.json();
+  return data.application;
+}
+async function patchApplication(id, body) {
+  const r = await fetch('/api/officer/applications/' + id, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error('Update failed');
+  const data = await r.json();
+  return data.application;
+}
+async function assignToMe(id) {
+  const r = await fetch('/api/officer/applications/' + id + '/assign-me', { method: 'POST' });
+  if (!r.ok) throw new Error('Assign failed');
+  const data = await r.json();
+  return data.application;
+}
+
+/* =========================================================
+   Boot
+   ========================================================= */
+async function boot() {
+  me = await fetchMe();
+  if (!me) return;
+  document.getElementById('me-name').textContent = me.name;
+  document.getElementById('me-role').textContent = me.role;
+  document.getElementById('me-initial').textContent = me.name.split(/\s+/).map(p => p[0]).slice(0,2).join('');
+
+  document.getElementById('signout').addEventListener('click', async () => {
+    await fetch('/api/officer/logout', { method: 'POST' });
+    location.href = '/officer/login';
+  });
+
+  await refresh();
+}
+
+async function refresh() {
+  state.applications = await fetchApplications();
+  render();
+}
+
+/* =========================================================
+   Side nav
+   ========================================================= */
+document.querySelectorAll('.sidenav a[data-filter-status]').forEach(a => {
+  a.addEventListener('click', () => {
+    document.querySelectorAll('.sidenav a').forEach(x => x.classList.remove('is-active'));
+    a.classList.add('is-active');
+    state.filterStatus = a.dataset.filterStatus;
+    state.filterMine = false;
+    render();
+  });
+});
+document.querySelector('.sidenav a[data-filter-mine]').addEventListener('click', e => {
+  document.querySelectorAll('.sidenav a').forEach(x => x.classList.remove('is-active'));
+  e.currentTarget.classList.add('is-active');
+  state.filterMine = true;
+  state.filterStatus = 'all';
+  render();
+});
+
+/* =========================================================
+   Filters
+   ========================================================= */
+document.getElementById('q').addEventListener('input', e => { state.search = e.target.value.toLowerCase(); render(); });
+document.getElementById('f-programme').addEventListener('change', e => { state.filterProgramme = e.target.value; render(); });
+document.getElementById('f-officer').addEventListener('change', e => { state.filterOfficer = e.target.value; render(); });
+document.getElementById('f-age').addEventListener('change', e => { state.filterAge = e.target.value; render(); });
+document.getElementById('clear-filters').addEventListener('click', () => {
+  state.search = ''; state.filterProgramme = ''; state.filterOfficer = ''; state.filterAge = '';
+  document.getElementById('q').value = '';
+  document.getElementById('f-programme').value = '';
+  document.getElementById('f-officer').value = '';
+  document.getElementById('f-age').value = '';
+  render();
+});
+
+document.querySelectorAll('thead th[data-sort]').forEach(th => {
+  th.addEventListener('click', () => {
+    const k = th.dataset.sort;
+    if (state.sortBy === k) state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
+    else { state.sortBy = k; state.sortDir = 'asc'; }
+    render();
+  });
+});
+
+/* =========================================================
+   Drawer
+   ========================================================= */
+const drawer = document.getElementById('drawer');
+const backdrop = document.getElementById('backdrop');
+async function openDrawer(id) {
+  state.selectedId = id;
+  drawer.classList.add('is-open');
+  drawer.setAttribute('aria-hidden', 'false');
+  backdrop.classList.add('is-open');
+  await renderDrawer();
+}
+function closeDrawer() {
+  state.selectedId = null;
+  drawer.classList.remove('is-open');
+  drawer.setAttribute('aria-hidden', 'true');
+  backdrop.classList.remove('is-open');
+  document.querySelectorAll('tbody tr').forEach(r => r.classList.remove('is-selected'));
+}
+document.getElementById('drawer-close').addEventListener('click', closeDrawer);
+backdrop.addEventListener('click', closeDrawer);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDrawer(); });
+
+/* =========================================================
+   Render
+   ========================================================= */
+function lastUpdate(a) { return a.current_status_at || a.created_at; }
+function ageDays(a) {
+  const t = String(lastUpdate(a)).replace('T',' ').split(' ')[0];
+  const d = new Date(t + 'T00:00:00');
+  // We don't fix "today" any more — the clock now matters.
+  const today = new Date();
+  return Math.max(0, Math.floor((today - d) / (1000 * 60 * 60 * 24)));
+}
+
+function render() {
+  const data = state.applications;
+
+  const programmes = [...new Set(data.map(a => a.programme_name))].sort();
+  const officers = [...new Set(data.map(a => a.assigned_officer_name).filter(Boolean))].sort();
+  const sSel = document.getElementById('f-programme');
+  sSel.innerHTML = '<option value="">All programmes</option>' + programmes.map(s => `<option ${s === state.filterProgramme ? 'selected' : ''}>${s}</option>`).join('');
+  const oSel = document.getElementById('f-officer');
+  oSel.innerHTML = '<option value="">All officers</option>' + officers.map(s => `<option ${s === state.filterOfficer ? 'selected' : ''}>${s}</option>`).join('') + `<option value="__none" ${state.filterOfficer === '__none' ? 'selected' : ''}>Unassigned</option>`;
+
+  document.getElementById('c-all').textContent = data.length;
+  Object.keys(STATUS_LABELS).forEach(s => {
+    const el = document.getElementById('c-' + s);
+    if (el) el.textContent = data.filter(a => a.current_status === s).length;
+  });
+  document.getElementById('c-mine').textContent = data.filter(a => a.assigned_officer_name === (me && me.name)).length;
+
+  let rows = data.slice();
+  if (state.filterStatus && state.filterStatus !== 'all') rows = rows.filter(a => a.current_status === state.filterStatus);
+  if (state.filterMine) rows = rows.filter(a => a.assigned_officer_name === (me && me.name));
+  if (state.filterProgramme) rows = rows.filter(a => a.programme_name === state.filterProgramme);
+  if (state.filterOfficer) rows = rows.filter(a => state.filterOfficer === '__none' ? !a.assigned_officer_name : a.assigned_officer_name === state.filterOfficer);
+  if (state.filterAge) rows = rows.filter(a => ageDays(a) > parseInt(state.filterAge, 10));
+  if (state.search) {
+    const q = state.search;
+    rows = rows.filter(a =>
+      (a.code || '').toLowerCase().includes(q) ||
+      (a.applicant_name || '').toLowerCase().includes(q) ||
+      (a.programme_name || '').toLowerCase().includes(q)
+    );
+  }
+
+  const dir = state.sortDir === 'asc' ? 1 : -1;
+  rows.sort((a, b) => {
+    let av, bv;
+    if (state.sortBy === 'age') { av = ageDays(a); bv = ageDays(b); }
+    else { av = a[state.sortBy] || ''; bv = b[state.sortBy] || ''; }
+    if (av < bv) return -1 * dir;
+    if (av > bv) return  1 * dir;
+    return 0;
+  });
+
+  document.querySelectorAll('thead th').forEach(th => {
+    th.classList.toggle('is-sorted', th.dataset.sort === state.sortBy);
+    const a = th.querySelector('.arrow');
+    if (a) a.textContent = th.dataset.sort === state.sortBy ? (state.sortDir === 'asc' ? '↑' : '↓') : '↕';
+  });
+
+  const titles = { all: 'All applications', received: 'Received', under_review: 'Under review',
+    action_needed: 'Action needed', approved: 'Approved', rejected: 'Not approved', completed: 'Completed' };
+  if (state.filterMine) {
+    document.getElementById('page-title').textContent = 'Assigned to me';
+    document.getElementById('page-sub').textContent = `Applications currently assigned to ${me ? me.name : 'you'}.`;
+  } else {
+    document.getElementById('page-title').textContent = titles[state.filterStatus] || 'All applications';
+    const subs = { all: 'Showing every application across all programmes.', received: 'New applications waiting to be picked up.',
+      under_review: 'Applications an officer is actively working on.', action_needed: 'Applications paused while we wait for the citizen.',
+      approved: 'Approved decisions awaiting delivery or starting on the programme.', rejected: 'Decisions that were not approved.', completed: 'Closed cases — service delivered.' };
+    document.getElementById('page-sub').textContent = subs[state.filterStatus] || subs.all;
+  }
+
+  const tbody = document.getElementById('tbody');
+  document.getElementById('r-shown').textContent = rows.length;
+  document.getElementById('r-total').textContent = data.length;
+  document.getElementById('empty').hidden = rows.length > 0;
+  tbody.innerHTML = rows.map(a => {
+    const age = ageDays(a);
+    const ageCls = (age > 7 && (a.current_status === 'received' || a.current_status === 'under_review' || a.current_status === 'action_needed')) ? 'is-old' : '';
+    return `
+      <tr data-id="${a.id}" class="${a.id === state.selectedId ? 'is-selected' : ''}">
+        <td class="code">${a.code}</td>
+        <td>${escapeHtml(a.programme_name)}</td>
+        <td class="applicant">${escapeHtml(a.applicant_name)}</td>
+        <td><span class="pill" data-s="${a.current_status}"><span class="dot"></span>${STATUS_LABELS[a.current_status] || a.current_status}</span></td>
+        <td class="${a.assigned_officer_name ? '' : 'dim'}">${a.assigned_officer_name || '— Unassigned —'}</td>
+        <td class="dim">${formatDate(lastUpdate(a))}</td>
+        <td class="age ${ageCls}">${age}d</td>
+      </tr>
+    `;
+  }).join('');
+  tbody.querySelectorAll('tr').forEach(tr => {
+    tr.addEventListener('click', () => openDrawer(parseInt(tr.dataset.id, 10)));
+  });
+}
+
+async function renderDrawer() {
+  if (!state.selectedId) return;
+  const app = await fetchApplication(state.selectedId);
+  if (!app) { closeDrawer(); return; }
+
+  document.getElementById('d-title').textContent = app.applicant_name;
+  document.getElementById('d-code').textContent = app.code;
+  document.getElementById('d-programme').textContent = app.programme_name;
+  document.getElementById('d-applicant').textContent = app.applicant_name;
+  document.getElementById('d-email').textContent = app.applicant_email || '—';
+  document.getElementById('d-phone').textContent = app.applicant_phone || '—';
+  document.getElementById('d-submitted').textContent = formatDate(app.created_at);
+  document.getElementById('d-assigned').textContent = app.assigned_officer_name || '— Unassigned —';
+
+  const pill = document.getElementById('d-pill');
+  pill.dataset.s = app.current_status;
+  pill.innerHTML = `<span class="dot"></span>${STATUS_LABELS[app.current_status] || app.current_status}`;
+
+  document.getElementById('d-newstatus').value = app.current_status;
+  document.getElementById('d-internal').value = '';
+  document.getElementById('d-message').value = '';
+  document.getElementById('d-saved').classList.remove('is-on');
+  document.getElementById('d-citizen-link').href = '/track/' + encodeURIComponent(app.code);
+
+  document.getElementById('d-formdata').innerHTML = renderFormData(app.form_data);
+
+  const ul = document.getElementById('d-activity');
+  ul.innerHTML = app.timeline.slice().reverse().map(t => `
+    <li class="s-${t.status}">
+      <div class="stamp">${formatDate(t.created_at)} — <strong>${STATUS_LABELS[t.status] || t.status}</strong></div>
+      ${t.citizen_message ? `<div class="body">${escapeHtml(t.citizen_message)}</div>` : ''}
+      ${t.by_officer_name ? `<div class="by">by ${escapeHtml(t.by_officer_name)}</div>` : ''}
+      ${t.internal_note ? `<div class="by" style="color:var(--amber);"><strong>Internal:</strong> ${escapeHtml(t.internal_note)}</div>` : ''}
+    </li>
+  `).join('');
+
+  document.querySelectorAll('tbody tr').forEach(r => r.classList.toggle('is-selected', parseInt(r.dataset.id, 10) === state.selectedId));
+}
+
+document.getElementById('d-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!state.selectedId) return;
+  try {
+    await patchApplication(state.selectedId, {
+      status: document.getElementById('d-newstatus').value,
+      citizen_message: document.getElementById('d-message').value,
+      internal_note: document.getElementById('d-internal').value
+    });
+  } catch (err) {
+    alert('Failed to save update.');
+    return;
+  }
+  document.getElementById('d-saved').classList.add('is-on');
+  setTimeout(() => document.getElementById('d-saved').classList.remove('is-on'), 2400);
+  await refresh();
+  await renderDrawer();
+});
+
+document.getElementById('d-assign-me').addEventListener('click', async () => {
+  if (!state.selectedId) return;
+  try { await assignToMe(state.selectedId); }
+  catch (err) { alert('Failed to assign.'); return; }
+  await refresh();
+  await renderDrawer();
+});
+
+function formatDate(s) {
+  if (!s) return '';
+  const cleaned = String(s).replace('T',' ').replace('Z','').split('.')[0];
+  const [d, t] = cleaned.split(' ');
+  if (!d) return '';
+  const [y, m, day] = d.split('-');
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${parseInt(day,10)} ${months[parseInt(m,10)-1]} ${y}` + (t ? ' ' + t.slice(0,5) : '');
+}
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/* =========================================================
+   Form-data renderer — generic, recursive, no per-programme schema.
+   The MVP intentionally accepts arbitrary JSON from upstream and renders
+   it as a key/value tree. Keys are humanised (snake_case and camelCase),
+   values respect type (booleans → Yes/No, arrays → lists, nested objects
+   → indented sub-trees, multi-line strings preserve breaks).
+   ========================================================= */
+function renderFormData(data) {
+  if (data == null) return '<div class="empty">— no submission data —</div>';
+  if (typeof data !== 'object') return '<pre>' + escapeHtml(String(data)) + '</pre>';
+  if (Array.isArray(data)) return '<dl>' + renderArrayRows(data) + '</dl>';
+  const entries = Object.entries(data);
+  if (entries.length === 0) return '<div class="empty">— empty —</div>';
+  return '<dl>' + entries.map(([k, v]) => `
+    <dt>${escapeHtml(humanise(k))}</dt>
+    <dd>${renderValue(v)}</dd>
+  `).join('') + '</dl>';
+}
+
+function renderArrayRows(arr) {
+  return arr.map((v, i) => `<dt>#${i + 1}</dt><dd>${renderValue(v)}</dd>`).join('');
+}
+
+function renderValue(v) {
+  if (v == null || v === '') return '<span class="empty">—</span>';
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+  if (typeof v === 'number') return escapeHtml(String(v));
+  if (typeof v === 'string') {
+    // Preserve newlines and detect URLs.
+    const escaped = escapeHtml(v).replace(/\n/g, '<br>');
+    if (/^https?:\/\//.test(v)) return `<a href="${encodeURI(v)}" target="_blank" rel="noopener">${escaped}</a>`;
+    return escaped;
+  }
+  if (Array.isArray(v)) {
+    // Array of primitives → comma-separated (compact).
+    if (v.every(x => typeof x !== 'object' || x === null)) {
+      return v.map(x => x == null ? '—' : escapeHtml(String(x))).join(', ');
+    }
+    // Array of objects → numbered, each rendered recursively.
+    return '<div class="nested">' + v.map((x, i) => `
+      <div style="margin-bottom:6px;">
+        <div style="color:var(--slate-500);font-size:12px;">#${i + 1}</div>
+        ${renderFormData(x)}
+      </div>
+    `).join('') + '</div>';
+  }
+  if (typeof v === 'object') return '<div class="nested">' + renderFormData(v) + '</div>';
+  return escapeHtml(String(v));
+}
+
+function humanise(key) {
+  return String(key)
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/^./, c => c.toUpperCase())
+    .replace(/\bnrn\b/gi, 'NRN')
+    .replace(/\bid\b/gi, 'ID')
+    .replace(/\burl\b/gi, 'URL')
+    .replace(/\bcv\b/gi, 'CV');
+}
+
+boot();
+</script>
+</body>
+</html>

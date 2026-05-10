@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Submit a test application — GovBB Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  body { font-family: Figtree, -apple-system, system-ui, sans-serif; font-size: 1.0625rem; line-height: 1.5; color: #000; background: #fff; margin: 0; min-height: 100vh; }
+  .container { max-width: 640px; margin: 0 auto; padding: 0 16px; }
+  /* chrome */
+  .official { background: #00267f; color: #fff; }
+  .official .container { display: flex; align-items: center; gap: 8px; padding: 8px 16px; font-size: .875rem; }
+  .header { background: #ffc726; }
+  .header .container { padding: 16px; font-weight: 800; font-size: 1.5rem; letter-spacing: -0.01em; }
+  .alpha { background: #e5e9f2; }
+  .alpha .container { padding: 8px 16px; font-size: 1rem; }
+  .alpha a { color: #0e5f64; }
+  main { padding: 32px 0 64px; }
+  h1 { font-size: 2.25rem; line-height: 1.1; font-weight: 800; letter-spacing: -0.01em; margin: 0 0 8px; }
+  .lead { color: #595959; margin: 0 0 24px; }
+  .info { background: #fff9e9; border-left: 4px solid #ffc726; padding: 14px 18px; border-radius: 2px; margin-bottom: 24px; font-size: 1rem; }
+  .field { margin-bottom: 16px; }
+  label { display: block; font-weight: 700; margin-bottom: 4px; }
+  input, select { width: 100%; box-sizing: border-box; border: 2px solid #000; padding: 9px 12px; font: inherit; font-size: 1.0625rem; border-radius: 2px; background: #fff; }
+  select { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'><path d='M1 1l5 5 5-5' stroke='%23000' stroke-width='2'/></svg>"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 38px; }
+  input:focus, select:focus { outline: none; box-shadow: inset 4px 4px 0 0 rgba(0,0,0,0.1); }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; background: #00654a; color: #fff; font-weight: 700; border: 0; cursor: pointer; font-size: 1.0625rem; border-radius: 2px; }
+  .btn:hover { background: #005039; }
+  .btn:focus-visible { outline: 3px solid #ffc726; outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+<div class="official"><div class="container">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
+  Official website of the Government of Barbados
+</div></div>
+
+<header class="header"><div class="container">GovBB</div></header>
+
+<div class="alpha"><div class="container">
+  This page is in <a href="#">Alpha</a>. Your feedback helps us improve.
+</div></div>
+
+<main>
+  <div class="container">
+    <h1>Submit a test application</h1>
+    <p class="lead">A demo form that posts to the same intake webhook the real alpha.gov.bb forms will call. Submitting will create a real application record, send a real (file-on-disk) confirmation email, and redirect you to the confirmation page.</p>
+
+    <div class="info">
+      In production, each YDP form on alpha.gov.bb POSTs to <code>/api/webhooks/form-submitted</code> with an <code>X-API-Key</code> header. The forms processor generates the reference code, sends the form to the MDA by email, and pushes the same payload here. This page mimics that contract — it generates a code in the browser and posts it with the dev API key.
+    </div>
+
+    <form id="f" novalidate>
+      <div class="field">
+        <label for="programme">Programme</label>
+        <select id="programme" required></select>
+      </div>
+      <div class="field">
+        <label for="name">Your full name</label>
+        <input id="name" type="text" required value="Test Applicant">
+      </div>
+      <div class="field">
+        <label for="email">Your email</label>
+        <input id="email" type="email" required value="test.applicant@example.com">
+      </div>
+      <div class="field">
+        <label for="phone">Phone (optional)</label>
+        <input id="phone" type="tel" value="(246) 555-0199">
+      </div>
+      <div class="field">
+        <label for="apikey">API key</label>
+        <input id="apikey" type="text" value="dev-key-alpha-gov-bb-forms-DO-NOT-USE-IN-PROD">
+        <p style="margin:6px 0 0; color:#595959; font-size:.9rem;">Pre-filled with the dev key seeded by <code>npm run seed</code>.</p>
+      </div>
+      <div class="field">
+        <label for="formdata">Form data (JSON)</label>
+        <textarea id="formdata" rows="10" style="width:100%; box-sizing:border-box; border:2px solid #000; padding:9px 12px; font-family:'JetBrains Mono', Menlo, Consolas, monospace; font-size:.95rem; border-radius:2px;">{
+  "date_of_birth": "2004-05-12",
+  "parish": "St. Michael",
+  "areas_of_interest": ["Mentoring", "Sports coaching"],
+  "availability": "6 months full-time",
+  "motivation": "I want to give back to my community.",
+  "has_criminal_record": false
+}</textarea>
+        <p style="margin:6px 0 0; color:#595959; font-size:.9rem;">Whatever JSON the upstream form posted. Will render in the officer view as a key/value tree.</p>
+      </div>
+      <button class="btn" type="submit">Submit application</button>
+    </form>
+
+    <p id="error" style="display:none; margin-top:16px; padding:12px 16px; background:#fff0f0; border:2px solid #a42c2c; color:#a42c2c; border-radius:2px; font-size:1rem;"></p>
+  </div>
+</main>
+
+<script>
+/* Same code-generation logic as the server-side codes.js, but client-side
+   so this page mirrors the production contract: caller generates the code,
+   server stores it. */
+const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function randomChar() {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return ALPHABET[buf[0] % ALPHABET.length];
+}
+function generateCode(programme_code) {
+  const year = new Date().getFullYear();
+  let suffix = '';
+  for (let i = 0; i < 7; i++) suffix += randomChar();
+  return `${programme_code}-${year}-${suffix}`;
+}
+
+(async () => {
+  const r = await fetch('/api/programmes');
+  const { programmes } = await r.json();
+  const sel = document.getElementById('programme');
+  sel.innerHTML = programmes.map(p => `<option value="${p.code}">${p.name} (${p.code})</option>`).join('');
+})();
+
+document.getElementById('f').addEventListener('submit', async e => {
+  e.preventDefault();
+  const err = document.getElementById('error');
+  err.style.display = 'none';
+
+  const programme_code = document.getElementById('programme').value;
+  const applicant = {
+    name: document.getElementById('name').value.trim(),
+    email: document.getElementById('email').value.trim(),
+    phone: document.getElementById('phone').value.trim() || null
+  };
+  const apikey = document.getElementById('apikey').value.trim();
+
+  let form_data = {};
+  try {
+    form_data = JSON.parse(document.getElementById('formdata').value || '{}');
+  } catch (ex) {
+    err.textContent = 'Form data is not valid JSON: ' + ex.message;
+    err.style.display = 'block';
+    return;
+  }
+
+  const code = generateCode(programme_code);
+
+  const r = await fetch('/api/webhooks/form-submitted', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-API-Key': apikey },
+    body: JSON.stringify({ code, programme_code, applicant, form_data })
+  });
+  if (!r.ok) {
+    const data = await r.json().catch(() => ({}));
+    err.textContent = (r.status + ' ') + (data.error || 'Submission failed');
+    err.style.display = 'block';
+    return;
+  }
+  const { confirmation_url } = await r.json();
+  location.href = confirmation_url;
+});
+</script>
+</body>
+</html>

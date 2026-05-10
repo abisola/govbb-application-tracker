@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Application sent — Government of Barbados</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --yellow-100: #ffc726; --yellow-10: #fff9e9;
+    --blue-100: #00267f; --blue-10: #e5e9f2;
+    --teal-00: #0e5f64; --teal-10: #eaf9f9;
+    --green-00: #00654a;
+    --grey-00: #e0e4e9; --mid-grey: #595959;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Figtree, -apple-system, system-ui, sans-serif; font-size: 1.25rem; line-height: 1.5; color: #000; background: #fff; margin: 0; min-height: 100vh; display: flex; flex-direction: column; }
+  .container { max-width: 760px; margin: 0 auto; padding: 0 16px; width: 100%; }
+  /* chrome */
+  .official { background: var(--blue-100); color: #fff; }
+  .official .container { display: flex; align-items: center; gap: 8px; padding-top: 8px; padding-bottom: 8px; font-size: .875rem; }
+  .header { background: var(--yellow-100); }
+  .header .container { padding: 16px 16px; font-weight: 800; font-size: 1.5rem; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; }
+  .alpha { background: var(--blue-10); }
+  .alpha .container { padding: 8px 16px; font-size: 1rem; }
+  .alpha a { color: var(--teal-00); }
+  main { flex: 1; padding: 32px 0 64px; }
+  /* hero panel */
+  .hero { background: var(--green-00); color: #fff; padding: 36px 32px; border-radius: 4px; }
+  .hero h1 { margin: 0 0 8px; font-size: 2.5rem; line-height: 1.05; font-weight: 800; letter-spacing: -0.01em; }
+  .hero p { margin: 0 0 8px; font-size: 1.125rem; }
+  .ref-label { margin: 22px 0 6px; font-size: 1rem; opacity: .9; }
+  .ref { font-family: 'JetBrains Mono', Menlo, Consolas, monospace; font-size: 2rem; font-weight: 700; letter-spacing: 1px; word-break: break-all; }
+  /* below-hero */
+  h2 { font-size: 1.5rem; font-weight: 700; margin: 32px 0 8px; }
+  .next { background: var(--yellow-10); border-left: 4px solid var(--yellow-100); padding: 16px 18px; border-radius: 2px; }
+  .next p { margin: 0 0 6px; }
+  .actions { margin-top: 28px; display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; font-weight: 700; font-size: 1.0625rem; border-radius: 4px; text-decoration: none; }
+  .btn-primary { background: var(--blue-100); color: #fff; }
+  .btn-primary:hover { background: #001b5c; }
+  .btn-secondary { background: #fff; color: var(--blue-100); border: 2px solid var(--blue-100); }
+  .btn-secondary:hover { background: var(--blue-10); }
+  .btn:focus-visible { outline: 3px solid var(--yellow-100); outline-offset: 2px; }
+  /* email block */
+  .email-note { background: var(--blue-10); padding: 14px 18px; border-radius: 4px; font-size: 1rem; margin-top: 16px; color: var(--mid-grey); }
+  .email-note strong { color: #000; }
+  /* contact */
+  .contact { margin-top: 28px; font-size: 1rem; color: var(--mid-grey); border-top: 1px solid var(--grey-00); padding-top: 16px; }
+  /* footer */
+  footer { background: var(--blue-100); color: #fff; padding: 32px 0; font-size: .9375rem; }
+  footer p { margin: 0 0 4px; }
+</style>
+</head>
+<body>
+
+<div class="official"><div class="container">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
+  Official website of the Government of Barbados
+</div></div>
+
+<header class="header"><div class="container">
+  <span style="display:inline-block; width:30px; height:30px; background:#fff; border-radius:6px; display:inline-grid; place-items:center; font-size:14px; font-weight:800; letter-spacing:-0.04em;">BB</span>
+  GovBB
+</div></header>
+
+<div class="alpha"><div class="container">
+  This page is in <a href="#">Alpha</a>. Your feedback helps us improve.
+</div></div>
+
+<main>
+  <div class="container">
+    <div class="hero">
+      <h1>Application sent</h1>
+      <p>Thanks, <span id="first-name">there</span>. We've received your application for <strong id="programme">your programme</strong>.</p>
+      <p class="ref-label">Your reference code</p>
+      <p class="ref" id="code">—</p>
+    </div>
+
+    <div class="email-note">
+      <strong>Save this code.</strong> We've also sent it to your email along with a link to track your application.
+    </div>
+
+    <h2>What happens next</h2>
+    <div class="next">
+      <p>An officer will review your application within <strong id="sla">14 working days</strong>.</p>
+      <p>You'll get an email each time the status changes. You can check the tracker any time.</p>
+    </div>
+
+    <div class="actions">
+      <a class="btn btn-primary" id="track-link" href="/">Track your application →</a>
+      <a class="btn btn-secondary" href="/">Track another application</a>
+    </div>
+
+    <div class="contact" id="contact">
+      Need help? Contact the team handling your application.
+    </div>
+  </div>
+</main>
+
+<footer><div class="container">
+  <p><strong>Ministry of Youth, Sport and Community Engagement</strong></p>
+  <p>Bay Street, Bridgetown, BB11000, Barbados</p>
+</div></footer>
+
+<script>
+const code = decodeURIComponent(location.pathname.split('/').pop() || '');
+document.getElementById('code').textContent = code;
+document.getElementById('track-link').href = '/track/' + encodeURIComponent(code);
+
+(async () => {
+  if (!code) return;
+  try {
+    const r = await fetch('/api/applications/' + encodeURIComponent(code));
+    if (!r.ok) return;
+    const { application } = await r.json();
+    const first = (application.applicant_name || '').split(' ')[0] || 'there';
+    document.getElementById('first-name').textContent = first;
+    document.getElementById('programme').textContent = application.programme_name;
+    document.getElementById('sla').textContent = (application.default_sla_days || 14) + ' working days';
+    document.getElementById('contact').innerHTML = `
+      Need help? Contact the team handling your application:
+      <strong>${application.contact_email || ''}</strong> · ${application.contact_phone || ''}
+      Quote your reference <strong style="font-family:'JetBrains Mono',monospace;">${application.code}</strong>.
+    `;
+    document.title = `Application sent — ${application.programme_name}`;
+  } catch(_) {}
+})();
+</script>
+</body>
+</html>

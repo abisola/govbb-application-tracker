@@ -1,0 +1,20 @@
+{
+  "name": "govbb-application-tracker",
+  "version": "0.1.0",
+  "description": "Application tracker pilot for the Ministry of Youth, Sport and Community Engagement (alpha.gov.bb)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "seed": "node seed.js",
+    "reset": "rm -rf data mail-out && node seed.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.5.0",
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.0",
+    "express-session": "^1.18.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
