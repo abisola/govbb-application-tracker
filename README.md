@@ -48,6 +48,19 @@ There are two officer roles:
 - **Programmes** — add new programmes, edit existing ones, and toggle "accepting applications". When a programme is closed, submissions still come in via the webhook but are flagged "after-close" so officers can spot them. The citizen-facing form list (`GET /api/programmes`) only shows currently accepting programmes.
 - **Audit log** — append-only feed of every meaningful action: logins (success and fail), application status changes, application assignments, intake from the webhook, officer create/update/deactivate/password reset, programme create/update/toggle, and email tests. Filter by action; paginate with "Load more". Each row shows actor, target, before→after diff, and IP.
 
+### Action-needed responses (citizen ↔ officer round-trip)
+
+When an officer sets status to "Action needed", they can specify what kind of response they want from the citizen. The four supported types each render a different input on the public tracker:
+
+- **Short answer** — single-line text input (e.g. "What is your contact phone number?")
+- **Longer answer** — textarea up to 4000 characters (e.g. "Tell us about your motivation")
+- **File upload** — PDF / Word / common images / plain text, max 10 MB
+- **Confirmation** — single tick-box (e.g. "I confirm I am a Barbadian citizen")
+
+What happens on submission: the response is recorded against the original `action_needed` event in `status_events`, status auto-advances to `under_review`, and an audit row is written. The officer drawer renders the citizen's response inline with the original prompt — text inline, files as a clickable download button (officer auth gated, never served from a static route). Uploads are stored at `UPLOAD_DIR/<application_id>/<random>.<ext>` (default `data/uploads/` locally, `/var/data/uploads/` on Render via the persistent disk).
+
+Reference code is the entire access control for citizen-side submission, same as the rest of the tracker. Production hardening should add per-IP rate limiting to `/api/applications/:code/respond`.
+
 ### Self-protection: admins can't lock everyone out
 
 The PATCH `/api/admin/officers/:id` endpoint refuses to deactivate the calling admin or revoke their own admin flag. To remove an admin, sign in as a different admin (or, in the worst case, set `is_admin = 1` directly in the DB).
@@ -225,6 +238,10 @@ PUT    /api/admin/officers/:id/programmes        replace assignments (whole-set)
 GET    /api/password-rules                       complexity rules + token TTL
 GET    /api/password-token/:token                validate a token, returns officer name+email
 POST   /api/set-password                         body: {token, password} — sets new password
+
+# Citizen response to "action needed"
+POST   /api/applications/:code/respond           JSON body for text/textarea/confirmation; multipart "file" for file uploads
+GET    /api/officer/applications/:id/uploads/:upload_id   officer-only stream of an uploaded file
 
 GET    /api/admin/programmes                  list programmes with counts and accepting flag
 POST   /api/admin/programmes                  create programme (auto-grants to active officers)

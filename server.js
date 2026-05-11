@@ -45,8 +45,10 @@
 
 const path = require('path');
 const crypto = require('crypto');
+const fs = require('fs');
 const express = require('express');
 const session = require('express-session');
+const multer = require('multer');
 
 const {
   db,
@@ -55,7 +57,9 @@ const {
   getApplicationById,
   listApplicationsForOfficer,
   listProgrammesForOfficer,
-  officerCanAccessApplication
+  officerCanAccessApplication,
+  getPendingAction,
+  recordActionResponse
 } = require('./db');
 const { generateUniqueCode } = require('./codes');
 const { authenticateOfficer, requireOfficer, requireAdmin } = require('./auth');
@@ -108,6 +112,58 @@ app.use(session({
     maxAge: 1000 * 60 * 60 * 8
   }
 }));
+
+/* =========================================================
+   File-upload setup (multer + on-disk storage).
+   Citizens upload files in response to "action needed" requests. Files
+   land under UPLOAD_DIR/<application_id>/<random>.<ext>, with metadata
+   in the `uploads` table. They are NEVER served from a static route —
+   downloads go through an authenticated endpoint that checks officer
+   access OR a matching reference code.
+   ========================================================= */
+const UPLOAD_DIR = process.env.UPLOAD_DIR
+  || path.join(process.env.TRACKER_DATA_DIR || path.join(__dirname, 'data'), 'uploads');
+if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+
+// Allow-list of mime types citizens may upload. Restrictive on purpose —
+// expand later as real cases come up.
+const ALLOWED_MIME = new Set([
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'image/jpeg', 'image/png', 'image/heic', 'image/heif', 'image/gif',
+  'text/plain'
+]);
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;  // 10 MB
+
+const uploadStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // We don't know application_id yet (req.params parsed after middleware),
+    // so put everything in UPLOAD_DIR root and move it after validation.
+    const code = (req.params.code || '').toUpperCase();
+    const app = code ? getApplicationByCode(code) : null;
+    if (!app) return cb(new Error('No application for upload'));
+    const dir = path.join(UPLOAD_DIR, String(app.id));
+    fs.mkdirSync(dir, { recursive: true });
+    req._appForUpload = app;
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase().slice(0, 8);
+    const rand = crypto.randomBytes(12).toString('hex');
+    cb(null, rand + ext);
+  }
+});
+const uploadCitizenFile = multer({
+  storage: uploadStorage,
+  limits: { fileSize: MAX_UPLOAD_BYTES, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (!ALLOWED_MIME.has(file.mimetype)) {
+      return cb(new Error('File type not allowed. Accepted: PDF, Word, common images, plain text.'));
+    }
+    cb(null, true);
+  }
+}).single('file');
 
 // Lightweight health check for Render's load balancer.
 app.get('/healthz', (req, res) => res.json({ ok: true, ts: new Date().toISOString() }));
@@ -288,6 +344,7 @@ app.get('/api/sample-codes', (req, res) => {
 app.get('/api/applications/:code', (req, res) => {
   const app = getApplicationByCode(req.params.code.toUpperCase().trim());
   if (!app) return res.status(404).json({ error: 'Application not found' });
+  const pending = getPendingAction(app.id);
   res.json({
     application: {
       code: app.code,
@@ -302,21 +359,178 @@ app.get('/api/applications/:code', (req, res) => {
       current_status: app.current_status,
       current_status_at: app.current_status_at,
       assigned_officer_name: app.assigned_officer_name,
-      // Citizen timeline only includes events that have something to say to
-      // the citizen. Internal-only rows (e.g. "Assign to me" — which writes a
-      // status_event with the current status and no citizen_message so the
-      // officer audit trail captures who picked up the case) are excluded.
-      // Without this filter, those rows render on the public tracker as
-      // "Not approved" or "Under review" with no body — confusing and
-      // sometimes alarming.
+      // The most recent "action needed" request that has not yet been
+      // responded to. The citizen tracker uses this to render the input.
+      pending_action: pending ? {
+        event_id: pending.id,
+        type: pending.action_type,
+        label: pending.action_label,
+        requested_at: pending.created_at
+      } : null,
+      // Citizen timeline excludes internal-only rows but keeps action_needed
+      // events even when their citizen_message is the default — those have
+      // a label the tracker can show.
       timeline: app.timeline
-        .filter(t => t.citizen_message && t.citizen_message.trim())
+        .filter(t => (t.citizen_message && t.citizen_message.trim()) || t.action_response_at)
         .map(t => ({
           status: t.status,
           message: t.citizen_message,
-          at: t.created_at
+          at: t.created_at,
+          action_type: t.action_type || null,
+          action_label: t.action_label || null,
+          action_response: t.action_response || null,
+          action_response_at: t.action_response_at || null,
+          // Public timeline exposes file metadata so the citizen sees "you
+          // uploaded foo.pdf at 2pm"; the actual download is officer-only.
+          uploads: (t.uploads || []).map(u => ({
+            original_filename: u.original_filename,
+            mime_type: u.mime_type,
+            size_bytes: u.size_bytes
+          }))
         }))
     }
+  });
+});
+
+/* =========================================================
+   Citizen response to an "action needed" request.
+   - For text / textarea / confirmation: regular JSON body.
+   - For file: multipart/form-data with field name "file".
+   Authentication: knowing the reference code is the entire access control,
+   same as the rest of the citizen-facing tracker.
+   ========================================================= */
+
+app.post('/api/applications/:code/respond', (req, res, next) => {
+  const code = (req.params.code || '').toUpperCase();
+  const application = getApplicationByCode(code);
+  if (!application) return res.status(404).json({ error: 'Application not found' });
+  const pending = getPendingAction(application.id);
+  if (!pending) return res.status(400).json({ error: 'There is no outstanding request on this application.' });
+
+  // For file uploads, hand off to multer middleware and continue in the
+  // callback. For everything else, parse JSON body normally.
+  if (pending.action_type === 'file') {
+    uploadCitizenFile(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message || 'Upload failed' });
+      if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+      try {
+        recordActionResponse({
+          event_id: pending.id,
+          application_id: application.id,
+          response_text: null,
+          file: {
+            original_filename: String(req.file.originalname || 'upload').slice(0, 200),
+            stored_filename: req.file.filename,
+            mime_type: req.file.mimetype,
+            size_bytes: req.file.size
+          }
+        });
+        finaliseCitizenResponse({ application, pending, req, res, summary: `Uploaded ${req.file.originalname}` });
+      } catch (e) {
+        // Clean up the orphan file if DB write failed.
+        try { fs.unlinkSync(req.file.path); } catch (_) {}
+        return res.status(500).json({ error: 'Could not record the response.' });
+      }
+    });
+  } else {
+    // Text / textarea / confirmation: JSON body.
+    const body = req.body || {};
+    let responseText = null;
+    if (pending.action_type === 'confirmation') {
+      if (body.confirmed !== true) {
+        return res.status(400).json({ error: 'You must tick the confirmation to submit.' });
+      }
+      responseText = 'Confirmed';
+    } else {
+      const raw = String(body.response || '').trim();
+      if (!raw) return res.status(400).json({ error: 'A response is required.' });
+      const limit = pending.action_type === 'textarea' ? 4000 : 500;
+      if (raw.length > limit) return res.status(400).json({ error: `Response too long (max ${limit} characters).` });
+      responseText = raw;
+    }
+    recordActionResponse({
+      event_id: pending.id,
+      application_id: application.id,
+      response_text: responseText,
+      file: null
+    });
+    finaliseCitizenResponse({ application, pending, req, res, summary: responseText.slice(0, 80) });
+  }
+});
+
+/** Common follow-up after recording a citizen response:
+ *   - Move status to 'under_review'
+ *   - Audit-log the action
+ *   - Respond with the refreshed application
+ */
+function finaliseCitizenResponse({ application, pending, req, res, summary }) {
+  insertStatusEvent({
+    application_id: application.id,
+    status: 'under_review',
+    citizen_message: 'Your response has been received and is being reviewed.',
+    internal_note: `Citizen responded to action request: ${summary}`,
+    by_officer_id: null
+  });
+  logAction({
+    actor: null,
+    action: 'application.citizen_response',
+    target_kind: 'application',
+    target_id: application.id,
+    metadata: requestMeta(req, { code: application.code, action_type: pending.action_type, summary })
+  });
+  // Re-fetch to return the updated state.
+  const refreshed = getApplicationByCode(application.code);
+  const pendingNow = getPendingAction(application.id);
+  res.status(200).json({
+    ok: true,
+    application: {
+      code: refreshed.code,
+      current_status: refreshed.current_status,
+      current_status_at: refreshed.current_status_at,
+      pending_action: pendingNow ? {
+        event_id: pendingNow.id,
+        type: pendingNow.action_type,
+        label: pendingNow.action_label,
+        requested_at: pendingNow.created_at
+      } : null
+    }
+  });
+}
+
+/* =========================================================
+   Officer-only download for citizen-uploaded files. Streamed, not
+   served from a static route, so access can be checked per-request.
+   ========================================================= */
+app.get('/api/officer/applications/:id/uploads/:upload_id', requireOfficer, (req, res) => {
+  const me = req.session.officer;
+  const appId = parseInt(req.params.id, 10);
+  const upId = parseInt(req.params.upload_id, 10);
+  if (!officerCanAccessApplication(me.id, me.is_admin, appId)) {
+    return res.status(403).json({ error: 'You do not have access to this application' });
+  }
+  const row = db.prepare(`
+    SELECT u.id, u.application_id, u.original_filename, u.stored_filename, u.mime_type, u.size_bytes
+    FROM uploads u
+    WHERE u.id = ? AND u.application_id = ?
+  `).get(upId, appId);
+  if (!row) return res.status(404).json({ error: 'Upload not found' });
+  const fullPath = path.join(UPLOAD_DIR, String(appId), row.stored_filename);
+  if (!fs.existsSync(fullPath)) return res.status(410).json({ error: 'File is no longer on disk' });
+
+  // Inline disposition with the original filename. Officers can right-click /
+  // save as if they want to keep a copy.
+  res.setHeader('Content-Type', row.mime_type || 'application/octet-stream');
+  res.setHeader('Content-Disposition',
+    `inline; filename="${row.original_filename.replace(/"/g, '\\"')}"`);
+  res.setHeader('Content-Length', row.size_bytes);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  fs.createReadStream(fullPath).pipe(res);
+
+  logAction({
+    actor: me,
+    action: 'application.upload_view',
+    target_kind: 'application', target_id: appId,
+    metadata: requestMeta(req, { upload_id: upId, filename: row.original_filename })
   });
 });
 
@@ -447,7 +661,7 @@ app.patch('/api/officer/applications/:id', requireOfficer, (req, res) => {
   const before = getApplicationById(id);
   if (!before) return res.status(404).json({ error: 'Not found' });
 
-  const { status, citizen_message, internal_note } = req.body || {};
+  const { status, citizen_message, internal_note, action_type, action_label } = req.body || {};
   if (!status) return res.status(400).json({ error: 'status required' });
 
   const allowed = JSON.parse(db.prepare('SELECT allowed_statuses FROM programmes WHERE id = ?').get(before.programme_id).allowed_statuses);
@@ -455,10 +669,27 @@ app.patch('/api/officer/applications/:id', requireOfficer, (req, res) => {
     return res.status(400).json({ error: `Status ${status} not allowed for this programme` });
   }
 
+  // Action requests are only valid when the status is being set to
+  // 'action_needed'. The four supported input types each render a different
+  // input on the citizen tracker.
+  const VALID_ACTION_TYPES = ['text', 'textarea', 'file', 'confirmation'];
+  let cleanActionType = null;
+  let cleanActionLabel = null;
+  if (status === 'action_needed' && action_type) {
+    if (!VALID_ACTION_TYPES.includes(action_type)) {
+      return res.status(400).json({ error: `action_type must be one of ${VALID_ACTION_TYPES.join(', ')}` });
+    }
+    if (!action_label || !String(action_label).trim()) {
+      return res.status(400).json({ error: 'action_label required when action_type is set' });
+    }
+    cleanActionType = action_type;
+    cleanActionLabel = String(action_label).trim().slice(0, 500);
+  }
+
   const defaults = {
     received: 'Application received.',
     under_review: 'An officer is now reviewing your application.',
-    action_needed: 'We need something from you. Please check your email.',
+    action_needed: cleanActionLabel || 'We need something from you. Please check your email.',
     approved: 'Decision: approved.',
     rejected: 'Decision: not approved.',
     completed: 'Your application is complete.'
@@ -470,7 +701,9 @@ app.patch('/api/officer/applications/:id', requireOfficer, (req, res) => {
     status,
     citizen_message: finalCitizenMessage,
     internal_note: (internal_note && internal_note.trim()) || null,
-    by_officer_id: me.id
+    by_officer_id: me.id,
+    action_type: cleanActionType,
+    action_label: cleanActionLabel
   });
 
   logAction({

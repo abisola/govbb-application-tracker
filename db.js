@@ -90,6 +90,26 @@ CREATE TABLE IF NOT EXISTS status_events (
   citizen_message TEXT,
   internal_note TEXT,
   by_officer_id INTEGER REFERENCES officers(id),
+  -- When an officer sets status to 'action_needed', they specify what kind
+  -- of response they want from the citizen. action_response captures what
+  -- the citizen submitted; action_response_at when. Both NULL for non-
+  -- action_needed events and for action_needed events still awaiting reply.
+  action_type TEXT,           -- 'text' | 'textarea' | 'file' | 'confirmation'
+  action_label TEXT,          -- the prompt shown to the citizen
+  action_response TEXT,       -- text body, or "1" for confirmation, or NULL for file (see uploads table)
+  action_response_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Files uploaded by citizens in response to an action_needed request.
+CREATE TABLE IF NOT EXISTS uploads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  status_event_id INTEGER NOT NULL REFERENCES status_events(id),
+  application_id INTEGER NOT NULL REFERENCES applications(id),
+  original_filename TEXT NOT NULL,
+  stored_filename TEXT NOT NULL,  -- random, on-disk
+  mime_type TEXT,
+  size_bytes INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -165,6 +185,8 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_created_at ON audit_log(created_at DESC
 CREATE INDEX IF NOT EXISTS idx_audit_log_target ON audit_log(target_kind, target_id);
 CREATE INDEX IF NOT EXISTS idx_pwreset_token_hash ON password_reset_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_pwreset_officer ON password_reset_tokens(officer_id);
+CREATE INDEX IF NOT EXISTS idx_uploads_status_event ON uploads(status_event_id);
+CREATE INDEX IF NOT EXISTS idx_uploads_application ON uploads(application_id);
 `);
 
 /* =========================================================
@@ -184,6 +206,10 @@ addColumnIfMissing('officers',     'is_active',                'INTEGER NOT NULL
 addColumnIfMissing('programmes',   'accepting_applications',   'INTEGER NOT NULL DEFAULT 1');
 addColumnIfMissing('programmes',   'closed_at',                'TEXT');
 addColumnIfMissing('applications', 'flagged_after_close',      'INTEGER NOT NULL DEFAULT 0');
+addColumnIfMissing('status_events','action_type',              'TEXT');
+addColumnIfMissing('status_events','action_label',             'TEXT');
+addColumnIfMissing('status_events','action_response',          'TEXT');
+addColumnIfMissing('status_events','action_response_at',       'TEXT');
 
 // Email-as-username: officers now log in with their email address, not a
 // short username. To avoid breaking pre-migration deployments, sync the
@@ -208,15 +234,22 @@ try {
  */
 const insertStatusEvent = db.transaction((event) => {
   const stmt = db.prepare(`
-    INSERT INTO status_events (application_id, status, citizen_message, internal_note, by_officer_id)
-    VALUES (@application_id, @status, @citizen_message, @internal_note, @by_officer_id)
+    INSERT INTO status_events (
+      application_id, status, citizen_message, internal_note, by_officer_id,
+      action_type, action_label
+    ) VALUES (
+      @application_id, @status, @citizen_message, @internal_note, @by_officer_id,
+      @action_type, @action_label
+    )
   `);
   const info = stmt.run({
     application_id: event.application_id,
     status: event.status,
     citizen_message: event.citizen_message || null,
     internal_note: event.internal_note || null,
-    by_officer_id: event.by_officer_id || null
+    by_officer_id: event.by_officer_id || null,
+    action_type: event.action_type || null,
+    action_label: event.action_label || null
   });
   db.prepare(`
     UPDATE applications
@@ -242,14 +275,71 @@ function getApplicationByCode(code) {
   if (!app) return null;
   app.timeline = db.prepare(`
     SELECT se.id, se.status, se.citizen_message, se.internal_note, se.created_at,
+           se.action_type, se.action_label, se.action_response, se.action_response_at,
            o.name AS by_officer_name
     FROM status_events se
     LEFT JOIN officers o ON o.id = se.by_officer_id
     WHERE se.application_id = ?
     ORDER BY se.created_at ASC, se.id ASC
   `).all(app.id);
+  // Attach upload metadata for any event that has file responses.
+  attachUploads(app.timeline);
   return app;
 }
+
+/** Attach uploads[] array to each timeline event that has citizen-uploaded files. */
+function attachUploads(timeline) {
+  if (!timeline || timeline.length === 0) return;
+  const ids = timeline.map(t => t.id);
+  const placeholders = ids.map(() => '?').join(',');
+  const rows = db.prepare(`
+    SELECT id, status_event_id, original_filename, mime_type, size_bytes, created_at
+    FROM uploads
+    WHERE status_event_id IN (${placeholders})
+    ORDER BY id ASC
+  `).all(...ids);
+  const byEvent = {};
+  for (const r of rows) {
+    if (!byEvent[r.status_event_id]) byEvent[r.status_event_id] = [];
+    byEvent[r.status_event_id].push(r);
+  }
+  for (const t of timeline) {
+    t.uploads = byEvent[t.id] || [];
+  }
+}
+
+/** The most recent action_needed event with no response yet. Null otherwise. */
+function getPendingAction(applicationId) {
+  const ev = db.prepare(`
+    SELECT id, status, action_type, action_label, created_at
+    FROM status_events
+    WHERE application_id = ?
+      AND action_type IS NOT NULL
+      AND action_response IS NULL
+      AND action_response_at IS NULL
+      AND status = 'action_needed'
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
+  `).get(applicationId);
+  return ev || null;
+}
+
+/** Record a citizen response on the given status_event row (atomic). */
+const recordActionResponse = db.transaction(({ event_id, application_id, response_text, file }) => {
+  db.prepare(`
+    UPDATE status_events
+    SET action_response = ?, action_response_at = datetime('now')
+    WHERE id = ?
+  `).run(response_text || null, event_id);
+  let uploadId = null;
+  if (file) {
+    uploadId = db.prepare(`
+      INSERT INTO uploads (status_event_id, application_id, original_filename, stored_filename, mime_type, size_bytes)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(event_id, application_id, file.original_filename, file.stored_filename, file.mime_type || null, file.size_bytes || null).lastInsertRowid;
+  }
+  return uploadId;
+});
 
 /**
  * List for the officer console. If `officerId` is supplied AND the officer
@@ -335,12 +425,14 @@ function getApplicationById(id) {
   catch (_) { app.form_data = null; }
   app.timeline = db.prepare(`
     SELECT se.id, se.status, se.citizen_message, se.internal_note, se.created_at,
+           se.action_type, se.action_label, se.action_response, se.action_response_at,
            o.name AS by_officer_name
     FROM status_events se
     LEFT JOIN officers o ON o.id = se.by_officer_id
     WHERE se.application_id = ?
     ORDER BY se.created_at ASC, se.id ASC
   `).all(app.id);
+  attachUploads(app.timeline);
   return app;
 }
 
@@ -351,5 +443,7 @@ module.exports = {
   getApplicationById,
   listApplicationsForOfficer,
   listProgrammesForOfficer,
-  officerCanAccessApplication
+  officerCanAccessApplication,
+  getPendingAction,
+  recordActionResponse
 };

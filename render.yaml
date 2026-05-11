@@ -27,6 +27,8 @@ services:
         value: /var/data
       - key: MAIL_OUT_DIR
         value: /var/data/mail-out
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
       - key: SESSION_SECRET
         generateValue: true   # Render generates once and stores
       - key: TRACKER_BASE_URL

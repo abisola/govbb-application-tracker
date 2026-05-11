@@ -364,9 +364,9 @@ async function renderStatus(code) {
   document.getElementById('s-next').textContent = meta.next;
 
   const action = document.getElementById('s-action');
-  if (app.current_status === 'action_needed') {
+  if (app.current_status === 'action_needed' && app.pending_action) {
     action.classList.remove('hidden');
-    action.innerHTML = `<a href="#" class="inline-block bg-bb-yellow-100 text-bb-black-00 font-bold px-m py-2 rounded-sm focus-ring border-2 border-bb-black-00 hover:bg-bb-yellow-40">Open the secure upload link from your email</a>`;
+    renderPendingActionForm(action, app);
   } else if (app.current_status === 'rejected') {
     action.classList.remove('hidden');
     action.innerHTML = `<a href="#" class="inline-block bg-white text-bb-blue-100 underline font-bold px-m py-2 rounded-sm focus-ring border-2 border-bb-blue-100 hover:bg-bb-blue-10">Start an appeal</a>`;
@@ -392,6 +392,114 @@ async function renderStatus(code) {
       </li>
     `;
   }).join('');
+}
+
+/* =========================================================
+   PENDING ACTION — render and submit the citizen's response
+   ========================================================= */
+function renderPendingActionForm(container, app) {
+  const pa = app.pending_action;
+  const type = pa.type;
+  let inputHtml = '';
+  if (type === 'text') {
+    inputHtml = `
+      <label for="resp-text" class="block font-bold mb-1">Your answer</label>
+      <input id="resp-text" name="response" type="text" maxlength="500" required
+             class="block w-full border-2 border-bb-black-00 px-3 py-2 rounded-sm focus-ring text-[1.0625rem]">
+    `;
+  } else if (type === 'textarea') {
+    inputHtml = `
+      <label for="resp-textarea" class="block font-bold mb-1">Your answer</label>
+      <textarea id="resp-textarea" name="response" rows="6" maxlength="4000" required
+                class="block w-full border-2 border-bb-black-00 px-3 py-2 rounded-sm focus-ring text-[1.0625rem]"></textarea>
+      <p class="text-[0.875rem] text-bb-mid-grey-00 mt-1"><span id="resp-count">0</span>/4000</p>
+    `;
+  } else if (type === 'file') {
+    inputHtml = `
+      <label for="resp-file" class="block font-bold mb-1">Upload your file</label>
+      <input id="resp-file" name="file" type="file" required
+             accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.heic,.heif,.gif,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/heic,image/heif,image/gif,text/plain"
+             class="block w-full text-[1rem]">
+      <p class="text-[0.875rem] text-bb-mid-grey-00 mt-1">Accepted: PDF, Word, JPG, PNG, HEIC, GIF, TXT. Maximum 10 MB.</p>
+    `;
+  } else if (type === 'confirmation') {
+    inputHtml = `
+      <label class="flex items-start gap-2 cursor-pointer">
+        <input id="resp-confirm" name="confirmed" type="checkbox" required class="mt-1 w-4 h-4">
+        <span class="text-[1.0625rem]"><strong>I confirm:</strong> ${escapeHtml(pa.label)}</span>
+      </label>
+    `;
+  }
+
+  // For the confirmation type, the prompt is rendered alongside the checkbox.
+  // For the others, the prompt sits above the input as the question.
+  const promptHtml = type === 'confirmation' ? '' : `
+    <p class="text-[1.0625rem] mb-s"><strong>${escapeHtml(pa.label)}</strong></p>
+  `;
+
+  container.innerHTML = `
+    <div class="bg-white border-2 border-bb-black-00 p-m rounded-sm">
+      <p class="text-[0.875rem] uppercase tracking-wider font-bold text-bb-mid-grey-00 mb-1">Respond here</p>
+      ${promptHtml}
+      <form id="resp-form" novalidate class="space-y-2">
+        ${inputHtml}
+        <div id="resp-error" class="hidden bg-[#fff0f0] text-[#a42c2c] border-2 border-[#a42c2c] p-2 rounded-sm text-[1rem]"></div>
+        <button id="resp-submit" type="submit"
+                class="inline-flex items-center gap-2 bg-bb-blue-100 hover:bg-[#001b5c] text-white font-bold text-[1.0625rem] px-m py-2 rounded-sm focus-ring border-2 border-bb-blue-100">
+          Submit your response
+        </button>
+      </form>
+    </div>
+  `;
+
+  // Live character count for textarea.
+  if (type === 'textarea') {
+    const ta = document.getElementById('resp-textarea');
+    const count = document.getElementById('resp-count');
+    ta.addEventListener('input', () => { count.textContent = ta.value.length; });
+  }
+
+  document.getElementById('resp-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const submitBtn = document.getElementById('resp-submit');
+    const errEl = document.getElementById('resp-error');
+    errEl.classList.add('hidden');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Submitting…';
+    try {
+      let r;
+      if (type === 'file') {
+        const file = document.getElementById('resp-file').files[0];
+        if (!file) throw new Error('Choose a file to upload.');
+        const fd = new FormData();
+        fd.append('file', file);
+        r = await fetch('/api/applications/' + encodeURIComponent(app.code) + '/respond', { method: 'POST', body: fd });
+      } else {
+        const payload = type === 'confirmation'
+          ? { confirmed: document.getElementById('resp-confirm').checked }
+          : { response: type === 'text' ? document.getElementById('resp-text').value : document.getElementById('resp-textarea').value };
+        r = await fetch('/api/applications/' + encodeURIComponent(app.code) + '/respond', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'We couldn\'t submit your response. Please try again.');
+      // Reload the status page to show the new "under review" state.
+      await renderStatus(app.code);
+      // Briefly highlight the status box so it's clear something happened.
+      const sb = document.getElementById('s-statusbox');
+      sb.style.transition = 'box-shadow .4s';
+      sb.style.boxShadow = '0 0 0 4px #ffc726';
+      setTimeout(() => { sb.style.boxShadow = ''; }, 1600);
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.classList.remove('hidden');
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Submit your response';
+    }
+  });
 }
 
 /* =========================================================
