@@ -63,6 +63,8 @@
   .tabbar button.is-active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
   .tabbar .admin-only[hidden] { display: none; }
   .badge-admin { background: var(--accent-soft); color: var(--accent); border-radius: 4px; padding: 2px 7px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; }
+  .tabbar .new-badge { background: #ffc726; color: #000; border-radius: 999px; padding: 1px 7px; font-size: 11px; font-weight: 700; min-width: 18px; text-align: center; line-height: 1.4; }
+  .tabbar .new-badge[hidden] { display: none; }
 
   main { grid-area: main; overflow: hidden; display: grid; grid-template-columns: 1fr; }
   /* Cases view re-introduces the per-status sidebar */
@@ -115,6 +117,23 @@
   table.t.row-click tbody tr { cursor: pointer; }
   table.t.row-click tbody tr:hover { background: var(--slate-50); }
   table.t tbody tr.is-selected { background: var(--accent-soft); }
+  /* Newly arrived applications get a yellow left-edge accent and a brief
+     attention pulse on first render. The .is-new class is removed after 60s
+     (or when the row is clicked), at which point the row returns to default. */
+  table.t tbody tr.is-new { box-shadow: inset 4px 0 0 0 #ffc726; }
+  table.t tbody tr.is-new.is-fresh { animation: row-pulse 1.6s ease-out 1; }
+  .new-pill { display: inline-flex; align-items: center; padding: 1px 6px; margin-left: 8px; background: #ffc726; color: #000; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; vertical-align: middle; }
+  @keyframes row-pulse {
+    0%   { background: #fff9e9; }
+    60%  { background: #fff9e9; }
+    100% { background: transparent; }
+  }
+  .poll-indicator { display: inline-flex; align-items: center; gap: 6px; color: var(--slate-500); font-size: 12px; }
+  .poll-indicator .pulse { width: 6px; height: 6px; border-radius: 999px; background: var(--green); animation: poll-pulse 2.4s ease-in-out infinite; }
+  @keyframes poll-pulse {
+    0%, 100% { opacity: 0.35; transform: scale(0.85); }
+    50%      { opacity: 1;    transform: scale(1); }
+  }
   table.t td { padding: 12px 14px; vertical-align: middle; color: var(--slate-800); }
   td.code { font-family: 'JetBrains Mono', 'SF Mono', Menlo, monospace; font-weight: 500; color: var(--slate-900); font-size: 12.5px; white-space: nowrap; }
   td.applicant { font-weight: 600; }
@@ -143,7 +162,7 @@
   .pill-off { background: var(--grey-soft); color: var(--slate-700); border-color: var(--slate-300); }
 
   /* Drawer */
-  .drawer { position: fixed; top: 56px; right: 0; bottom: 0; width: min(640px, 100vw); background: #fff; border-left: 1px solid var(--slate-200); box-shadow: -10px 0 30px rgba(15, 23, 42, 0.08); transform: translateX(100%); transition: transform .25s ease; overflow-y: auto; z-index: 30; }
+  .drawer { position: fixed; top: 56px; right: 0; bottom: 0; width: min(820px, 90vw); background: #fff; border-left: 1px solid var(--slate-200); box-shadow: -10px 0 30px rgba(15, 23, 42, 0.08); transform: translateX(100%); transition: transform .25s ease; overflow-y: auto; z-index: 30; }
   .drawer.is-open { transform: translateX(0); }
   .drawer-backdrop { position: fixed; inset: 56px 0 0 0; background: rgba(15, 23, 42, .25); opacity: 0; pointer-events: none; transition: opacity .2s ease; z-index: 20; }
   .drawer-backdrop.is-open { opacity: 1; pointer-events: auto; }
@@ -268,7 +287,7 @@
 </div>
 
 <nav class="tabbar" id="tabbar">
-  <button data-view="cases" class="is-active">Cases</button>
+  <button data-view="cases" class="is-active">Cases <span class="new-badge" id="cases-new-badge" hidden>0</span></button>
   <button data-view="dashboard" class="admin-only" hidden>Dashboard</button>
   <button data-view="users"     class="admin-only" hidden>Users</button>
   <button data-view="programmes" class="admin-only" hidden>Programmes</button>
@@ -330,6 +349,11 @@
 
         <div class="results-bar">
           <span><strong id="r-shown">0</strong> of <strong id="r-total">0</strong> applications</span>
+          <span style="flex:1"></span>
+          <span class="poll-indicator" id="poll-status" title="Auto-refreshing every 20 seconds">
+            <span class="pulse"></span>
+            <span id="poll-text">Live</span>
+          </span>
         </div>
 
         <div class="table-wrap">
@@ -567,11 +591,21 @@ const state = {
   search: '', sortBy: 'current_status_at', sortDir: 'desc',
   selectedId: null,
   applications: [],
+  // Polling + "new arrivals" tracking. Maps application_id -> arrivalTs.
+  // The .is-new visual indicator stays for NEW_HIGHLIGHT_MS, then fades.
+  newApplicationIds: {},
+  freshHighlightIds: new Set(),   // ids that should animate on this render only
+  pollTimer: null,
+  isPolling: false,
+  firstFetchDone: false,
   // Admin caches
   officers: [],
   programmes: [],
   audit: { entries: [], hasMore: false, action: '' }
 };
+
+const POLL_INTERVAL_MS = 20 * 1000;
+const NEW_HIGHLIGHT_MS = 60 * 1000;
 
 /* =========================================================
    Tab switching
@@ -640,13 +674,106 @@ async function boot() {
   });
 
   await refreshCases();
+  startPolling();
+  // Every 10s, expire "new" marks older than NEW_HIGHLIGHT_MS so the indicator
+  // fades even when no poll has happened (e.g. nothing new arriving).
+  setInterval(() => {
+    const now = Date.now();
+    let changed = false;
+    for (const idStr of Object.keys(state.newApplicationIds)) {
+      if (now - state.newApplicationIds[idStr] > NEW_HIGHLIGHT_MS) {
+        delete state.newApplicationIds[idStr];
+        changed = true;
+      }
+    }
+    if (changed) renderCases();
+  }, 10 * 1000);
 }
 
 async function refreshCases() {
   const data = await api('GET', '/api/officer/applications');
-  state.applications = data.applications;
-  renderCases();
+  applyApplicationsUpdate(data.applications, /* fromPoll= */ false);
 }
+
+/**
+ * Merge the latest server snapshot into state. On the first fetch nothing is
+ * marked as "new". On subsequent fetches (polls), any ID we haven't seen
+ * before is marked new — yellow accent stripe on the row, optional "NEW" pill,
+ * pulse animation on first render, and a badge on the Cases tab.
+ */
+function applyApplicationsUpdate(applications, fromPoll) {
+  const previousIds = new Set(state.applications.map(a => a.id));
+  state.applications = applications;
+
+  if (state.firstFetchDone && fromPoll) {
+    const now = Date.now();
+    let fresh = 0;
+    for (const a of applications) {
+      if (!previousIds.has(a.id)) {
+        state.newApplicationIds[a.id] = now;
+        state.freshHighlightIds.add(a.id);
+        fresh++;
+      }
+    }
+    // Expire old "new" marks.
+    for (const idStr of Object.keys(state.newApplicationIds)) {
+      if (now - state.newApplicationIds[idStr] > NEW_HIGHLIGHT_MS) {
+        delete state.newApplicationIds[idStr];
+      }
+    }
+    if (fresh > 0) {
+      // Brief title-bar nudge so users on another tab notice.
+      flashDocumentTitle(`(${fresh} new) `);
+    }
+  }
+  state.firstFetchDone = true;
+  renderCases();
+  // After render, clear the one-shot freshHighlightIds so the pulse only
+  // animates once per arrival.
+  setTimeout(() => { state.freshHighlightIds.clear(); }, 50);
+}
+
+let _origTitle = null;
+let _flashTimer = null;
+function flashDocumentTitle(prefix) {
+  if (!_origTitle) _origTitle = document.title;
+  document.title = prefix + _origTitle;
+  clearTimeout(_flashTimer);
+  _flashTimer = setTimeout(() => { document.title = _origTitle; }, 8000);
+}
+
+/* =========================================================
+   Background polling — runs every POLL_INTERVAL_MS while the
+   tab is visible and the user is signed in.
+   ========================================================= */
+async function pollOnce() {
+  if (state.isPolling) return;        // Don't overlap calls.
+  if (document.hidden) return;        // Don't waste cycles on hidden tabs.
+  state.isPolling = true;
+  try {
+    const data = await api('GET', '/api/officer/applications');
+    applyApplicationsUpdate(data.applications, /* fromPoll= */ true);
+  } catch (e) {
+    // Silent — usually a transient blip. Next tick will retry.
+    console.warn('[poll]', e.message);
+  } finally {
+    state.isPolling = false;
+  }
+}
+function startPolling() {
+  stopPolling();
+  state.pollTimer = setInterval(pollOnce, POLL_INTERVAL_MS);
+}
+function stopPolling() {
+  if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
+}
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  // Tab became visible again — do an immediate poll so the user sees fresh
+  // data right away rather than waiting for the next interval.
+  pollOnce();
+});
+window.addEventListener('beforeunload', stopPolling);
 
 /* =========================================================
    Cases — sidenav, filters, sort, table, drawer
@@ -796,9 +923,17 @@ function renderCases() {
     const age = ageDays(a);
     const ageCls = (age > 7 && (a.current_status === 'received' || a.current_status === 'under_review' || a.current_status === 'action_needed')) ? 'is-old' : '';
     const flag = a.flagged_after_close ? `<span class="pill pill-flag" style="margin-left:6px;font-size:11px;">After-close</span>` : '';
+    const isNew = !!state.newApplicationIds[a.id];
+    const isFresh = state.freshHighlightIds.has(a.id);
+    const classes = [
+      a.id === state.selectedId ? 'is-selected' : '',
+      isNew ? 'is-new' : '',
+      isFresh ? 'is-fresh' : ''
+    ].filter(Boolean).join(' ');
+    const newPill = isNew ? `<span class="new-pill">New</span>` : '';
     return `
-      <tr data-id="${a.id}" class="${a.id === state.selectedId ? 'is-selected' : ''}">
-        <td class="code">${a.code}</td>
+      <tr data-id="${a.id}" class="${classes}">
+        <td class="code">${a.code}${newPill}</td>
         <td>${escapeHtml(a.programme_name)}${flag}</td>
         <td class="applicant">${escapeHtml(a.applicant_name)}</td>
         <td><span class="pill" data-s="${a.current_status}"><span class="dot"></span>${STATUS_LABELS[a.current_status] || a.current_status}</span></td>
@@ -809,8 +944,29 @@ function renderCases() {
     `;
   }).join('');
   tbody.querySelectorAll('tr').forEach(tr => {
-    tr.addEventListener('click', () => openDrawer(parseInt(tr.dataset.id, 10)));
+    tr.addEventListener('click', () => {
+      const id = parseInt(tr.dataset.id, 10);
+      // Opening a row clears its "new" mark — the officer has now seen it.
+      if (state.newApplicationIds[id]) {
+        delete state.newApplicationIds[id];
+        tr.classList.remove('is-new', 'is-fresh');
+        const pill = tr.querySelector('.new-pill');
+        if (pill) pill.remove();
+        updateNewBadge();
+      }
+      openDrawer(id);
+    });
   });
+
+  updateNewBadge();
+}
+
+/** Sync the "N new" pill on the Cases tab with the current state. */
+function updateNewBadge() {
+  const badge = document.getElementById('cases-new-badge');
+  const n = Object.keys(state.newApplicationIds).length;
+  if (n > 0) { badge.textContent = String(n); badge.hidden = false; }
+  else { badge.hidden = true; }
 }
 
 async function renderDrawer() {
