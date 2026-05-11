@@ -330,6 +330,7 @@ app.get('/api/programmes', (req, res) => {
 });
 
 app.get('/api/sample-codes', (req, res) => {
+  if (IS_PROD) return res.status(404).json({ error: 'Not found' });
   const rows = db.prepare(`
     SELECT a.code, p.name AS programme_name, ap.name AS applicant_name, a.current_status
     FROM applications a
